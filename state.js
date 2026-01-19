@@ -70,11 +70,93 @@ export let store = createStore({
 	edgeMap: {},
 });
 
+function makeLineArrowMarker(
+	size = 1,
+	id = "arrow",
+	color = "black",
+	strokeWidth = 2,
+) {
+	const box = 10 * size;
+	const cx = box;
+	const cy = box / 2;
+	const arm = 4 * size;
+
+	return [
+		"defs",
+		{},
+		[
+			"marker",
+			{
+				id,
+				markerWidth: box + 5 * size,
+				markerHeight: box + 5 * size,
+				refX: cx,
+				refY: cy,
+				orient: "auto",
+				markerUnits: "strokeWidth",
+			},
+			[
+				"path",
+				{
+					d: `
+            M ${cx - arm} ${cy - arm}
+            L ${cx} ${cy}
+            L ${cx - arm} ${cy + arm}
+          `,
+					stroke: color,
+					strokeWidth,
+					strokeLinecap: "round",
+					strokeLinejoin: "round",
+					fill: "none",
+				},
+			],
+		],
+	];
+}
+
+function makeXMarker(size = 1, id = "x", color = "black", strokeWidth = 2) {
+	const box = 10 * size;
+	const pad = 2 * size;
+
+	return [
+		"defs",
+		{},
+		[
+			"marker",
+			{
+				id,
+				markerWidth: box,
+				markerHeight: box,
+				refX: box / 2,
+				refY: box / 2,
+				orient: "auto",
+				markerUnits: "strokeWidth",
+			},
+			[
+				"path",
+				{
+					d: `
+            M ${pad} ${pad}
+            L ${box - pad} ${box - pad}
+            M ${box - pad} ${pad}
+            L ${pad} ${box - pad}
+          `,
+					stroke: color,
+					strokeWidth,
+					strokeLinecap: "round",
+					fill: "none",
+				},
+			],
+		],
+	];
+}
+
 export let registery = createRegistery();
 registery.register("canvas", {}, {}, renderCanvas);
 registery.register("circle", {}, {}, renderCircle);
 registery.register("x", {}, {}, renderNumberPropFn("x"));
 registery.register("y", {}, {}, renderNumberPropFn("y"));
+registery.register("strokeWeight", {}, {}, renderNumberPropFn("strokeWeight"));
 
 store.subscribe(["data", "nodes"], (e) => {
 	// because we said children updates are true,
@@ -420,30 +502,31 @@ let edges = memo(() => {
 		console.log("running");
 
 		let boundingToSide = (b, side) => {
+			let s = 10;
 			if (side == "top") {
 				return ({
 					x: b.x + b.width / 2,
-					y: b.y,
+					y: b.y - s,
 				});
 			}
 
 			if (side == "bottom") {
 				return ({
 					x: b.x + b.width / 2,
-					y: b.y + b.height,
+					y: b.y + b.height + s,
 				});
 			}
 
 			if (side == "right") {
 				return ({
-					x: b.x + b.width,
+					x: b.x + b.width + s,
 					y: b.y + b.height / 2,
 				});
 			}
 
 			if (side == "left") {
 				return ({
-					x: b.x,
+					x: b.x - s,
 					y: b.y + b.height / 2,
 				});
 			}
@@ -487,7 +570,8 @@ let svgBackground = () => {
 	return [
 		"svg.background",
 		{ width: state.dimensions, height: state.dimensions },
-		,
+		makeLineArrowMarker(.4, "arrow", "#222"),
+		makeXMarker(.4),
 		currentConnection,
 		dragMarker,
 		edges,

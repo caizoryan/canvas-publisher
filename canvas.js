@@ -12,6 +12,20 @@ import {
 	subscribeToId,
 } from "./state.js";
 
+import { blobStream } from "./blob-stream.js";
+import { PDFDocument } from "./pdfkit.standalone.js";
+import * as PDFJS from "https://esm.sh/pdfjs-dist";
+import * as PDFWorker from "https://esm.sh/pdfjs-dist/build/pdf.worker.min";
+
+let queued = {};
+try {
+	PDFJS.GlobalWorkerOptions.workerSrc = PDFWorker;
+	console.log("TRIED");
+} catch (e) {
+	window.pdfjsWorker = PDFWorker;
+	console.log("CAUGHT");
+}
+
 // ~~~~~~~~~~~~~~~~~~~
 let R = (location, id) => (key) => ({
 	isReactive: true,
@@ -57,28 +71,85 @@ export const renderCanvas = (node) => {
 	let edges = resizers(left, top, width, height, { onstart, onend });
 	let connects = connectors(node, left, top, width, height);
 
-	let canvas = dom(["canvas", { width: width, height: height }]);
+	let canvas = dom(["canvas", {
+		width: width.value(),
+		height: height.value(),
+	}]);
 	let el = dom(".draggable.node", { style }, ...edges, canvas, ...connects);
 
 	let ctx = canvas.getContext("2d");
 
-	memo(() => {
-		ctx.fillStyle = "white";
-		ctx.fillRect(0, 0, width.value() - 10, height.value() - 10);
+	function loadAndRender(url) {
+		let start = new Date();
+		var loadingTask = PDFJS.getDocument(url);
+		loadingTask.promise.then(
+			(pdf) => renderPDF(pdf, start),
+			(reason) => console.error(reason),
+		);
+	}
 
-		ctx.strokeStyle = "black";
-		ctx.strokeRect(10, 10, 140, 160);
+	let renderPDF = (pdf, start) => {
+		let end = new Date();
+		let ms = end.valueOf() - start.valueOf();
+		console.log("PDF loaded in", ms);
 
-		if (inputs.value()) {
-			Object.values(inputs.value()).forEach((d) => {
-				if (!d) return;
-				if (d.draw) d.draw(ctx);
+		// Fetch the first page
+		let pageNumber = 1;
+		pdf.getPage(pageNumber).then(function(page) {
+			console.log("Page loaded");
+			let scale = 1;
+			let viewport = page.getViewport({ scale: scale });
+
+			canvas.height = viewport.height;
+			canvas.width = viewport.width;
+			// Render PDF page into canvas context
+			let renderContext = { canvasContext: ctx, viewport: viewport };
+			if (queued[node.id]) {
+				queued[node.id].cancel();
+				queued[node.id] = undefined;
+			}
+
+			let renderTask = page.render(renderContext);
+			queued[node.id] = renderTask;
+			// queued = renderTask
+
+			renderTask.promise.then(function() {
+				queued[node.id] = undefined;
+				// console.log('Page rendered');
 			});
+		});
+	};
+
+	let draw = (drawables) => {
+		if (drawables.length == 0) return;
+		const doc = new PDFDocument({ layout: "landscape" });
+		let stream = doc.pipe(blobStream());
+		drawables.forEach((fn) => {
+			if (!fn) return;
+			fn.draw ? fn.draw(doc) : console.log("NOT A FN", fn);
+		});
+		doc.end();
+		stream.on(
+			"finish",
+			() => loadAndRender(stream.toBlobURL("application/pdf")),
+		);
+	};
+
+	// wrap this in a RAF
+	let next = false;
+	function RAFDraw() {
+		if (next) {
+			if (inputs.value()) draw(Object.values(inputs.value()));
+			next = false;
 		}
-	}, [width, height, inputs]);
+		requestAnimationFrame(RAFDraw);
+	}
+
+	memo(() => next = true, [inputs]);
+
+	requestAnimationFrame(RAFDraw);
 
 	// Door
-
 	setTimeout(() => {
 		drag(el, {
 			onstart,
@@ -112,29 +183,26 @@ export const renderCircle = (node) => {
 		subscribe: (fn) => store.subscribe(EDGEMAP.concat([node.id]), fn),
 	};
 
-	let outputBuffer = memo(() => outputs.value().map((e) => e.blockId), [
-		outputs,
-	]);
-	// let removeBuffer = (id) => outputBuffer.next(e => e.filter(f => f!=id))
+	let outputBuffer = memo(
+		() =>
+			outputs
+				.value()
+				.map((e) => e.blockId),
+		[outputs],
+	);
 
-	// subscribe to edges
-	store.subscribe(EDGEMAP.concat([node.id]), (e) => {
-		console.log("Circle Outpus", e);
-	});
-
-	store.subscribe(BUFFERS.concat([node.id]), (e) => {
-		console.log("Circle Input", e);
-		inputs.next(e);
-	});
+	store.subscribe(BUFFERS.concat([node.id]), (e) => inputs.next(e));
 
 	let props = {
 		x: 150,
 		y: 150,
+		fill: undefined,
+		stroke: "black",
+		strokeWeight: 1,
 	};
 
 	inputs.subscribe((v) => {
 		Object.values(v).forEach((p) => {
-			console.log(p);
 			if (!p) return;
 			Object.entries(p).forEach(([key, value]) => {
 				if (props[key]) props[key] = value;
@@ -143,11 +211,26 @@ export const renderCircle = (node) => {
 		update.next((e) => e + 1);
 	});
 
-	let drawCircleFn = () => (ctx) => {
+	let drawCircleDocFn = (x, y) => (doc) => {
+		doc.save();
+
+		doc.lineWidth(props.strokeWeight);
+		if (!x) x = props.x;
+		if (!y) y = props.y;
+		doc.circle(x, y, size.value() / 5);
+		if (props.stroke) doc.stroke(props.stroke);
+		if (props.fill) doc.fill(props.fill);
+
+		doc.restore();
+	};
+
+	let drawCircleFn = (x, y) => (ctx) => {
+		if (!x) x = props.x;
+		if (!y) y = props.y;
 		ctx.strokeStyle = "black";
 		ctx.strokeWidth = 8;
 		ctx.beginPath();
-		ctx.arc(props.x, props.y, size.value(), 0, 2 * Math.PI);
+		ctx.arc(x, y, size.value() / 2, 0, 2 * Math.PI);
 		ctx.stroke();
 	};
 
@@ -156,27 +239,18 @@ export const renderCircle = (node) => {
 
 	let slider = ["input", {
 		type: "range",
-		min: 50,
+		min: 1,
 		max: 450,
 		oninput: (e) => {
 			size.next(e.target.value);
 		},
 	}];
 
-	let drawCircle = (ctx) => {
-		ctx.strokeStyle = "black";
-		ctx.strokeWidth = 8;
-		ctx.beginPath();
-		ctx.arc(95, 50, size.value(), 0, 2 * Math.PI);
-		ctx.stroke();
-	};
-
-	let interval;
 	memo(() => {
 		if (!outputBuffer.value()) return;
 		outputBuffer.value().forEach((id) => {
 			store.apply(["buffers", id], "set", [node.id, {
-				draw: drawCircleFn(500),
+				draw: drawCircleDocFn(),
 			}], false);
 		});
 	}, [outputBuffer, size, update]);
@@ -219,7 +293,7 @@ export const renderCircle = (node) => {
 
 	memo(() => {
 		ctx.clearRect(0, 0, width.value(), height.value());
-		drawCircleFn()(ctx);
+		drawCircleFn(width.value() / 2, height.value() / 2)(ctx);
 	}, [width, height, size, inputs]);
 
 	// Door
@@ -261,7 +335,7 @@ export const renderNumberPropFn = (key) => (node) => {
 	let size = reactive(50);
 	let slider = ["input", {
 		type: "range",
-		min: 50,
+		min: 1,
 		max: 450,
 		oninput: (e) => {
 			size.next(e.target.value);
@@ -328,3 +402,5 @@ export const renderNumberPropFn = (key) => (node) => {
 
 	return el;
 };
+
+// GAME PLAN
