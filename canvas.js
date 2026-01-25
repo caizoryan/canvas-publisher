@@ -8,6 +8,7 @@ import {
 	BUFFERS,
 	EDGEMAP,
 	getNodeLocation,
+	state,
 	store,
 	subscribeToId,
 } from "./state.js";
@@ -25,6 +26,12 @@ try {
 	window.pdfjsWorker = PDFWorker;
 	console.log("CAUGHT");
 }
+
+let addToSelection = (block, e) => {
+	console.log("Changing?", [block.id]);
+	if (e.shiftKey) state.selected.next((e) => [...e, block.id]);
+	else state.selected.next([block.id]);
+};
 
 // ~~~~~~~~~~~~~~~~~~~
 let R = (location, id) => (key) => ({
@@ -54,6 +61,7 @@ export const renderCanvas = (node) => {
 	);
 
 	let onstart = (e) => {
+		addToSelection(node, e);
 		store.startBatch();
 
 		left.next(left.value());
@@ -69,12 +77,16 @@ export const renderCanvas = (node) => {
 	};
 
 	let edges = resizers(left, top, width, height, { onstart, onend });
+
+	let pageWidth = 612;
+	let pageHeight = 792;
 	let connects = connectors(node, left, top, width, height);
 
 	let canvas = dom(["canvas", {
 		width: width.value(),
 		height: height.value(),
 	}]);
+
 	let el = dom(".draggable.node", { style }, ...edges, canvas, ...connects);
 
 	let ctx = canvas.getContext("2d");
@@ -121,13 +133,22 @@ export const renderCanvas = (node) => {
 	};
 
 	let draw = (drawables) => {
+		let fns = {
+			"Circle": drawCircleDocFn,
+		};
 		if (drawables.length == 0) return;
-		const doc = new PDFDocument({ layout: "landscape" });
+		const doc = new PDFDocument({
+			layout: "landscape",
+			size: [pageWidth, pageHeight],
+		});
 		let stream = doc.pipe(blobStream());
 		drawables.forEach((fn) => {
 			if (!fn) return;
-			fn.draw ? fn.draw(doc) : console.log("NOT A FN", fn);
+			typeof fns[fn.draw[0]] == "function"
+				? fns[fn.draw[0]](fn.draw[1])(doc)
+				: console.log("ERROR: Neither a fn nor a key");
 		});
+
 		doc.end();
 		stream.on(
 			"finish",
@@ -139,6 +160,7 @@ export const renderCanvas = (node) => {
 	let next = false;
 	function RAFDraw() {
 		if (next) {
+			// sort these into drawables and properties vibes (props can be width/height...)
 			if (inputs.value()) draw(Object.values(inputs.value()));
 			next = false;
 		}
@@ -164,6 +186,17 @@ export const renderCanvas = (node) => {
 	return el;
 };
 
+let drawCircleDocFn = (props) => (doc) => {
+	doc.save();
+	doc.lineWidth(props.strokeWeight);
+	let x = props.x;
+	let y = props.y;
+	doc.circle(x, y, 20);
+	if (props.stroke) doc.stroke(props.stroke);
+	if (props.fill) doc.fill(props.fill);
+	doc.restore();
+};
+
 export const renderCircle = (node) => {
 	let r = R(getNodeLocation(node.id), node.id);
 
@@ -183,7 +216,7 @@ export const renderCircle = (node) => {
 		subscribe: (fn) => store.subscribe(EDGEMAP.concat([node.id]), fn),
 	};
 
-	let outputBuffer = memo(
+	let outputBuffers = memo(
 		() =>
 			outputs
 				.value()
@@ -196,6 +229,8 @@ export const renderCircle = (node) => {
 	let props = {
 		x: 150,
 		y: 150,
+		width: 50,
+		height: 50,
 		fill: undefined,
 		stroke: "black",
 		strokeWeight: 1,
@@ -205,62 +240,48 @@ export const renderCircle = (node) => {
 		Object.values(v).forEach((p) => {
 			if (!p) return;
 			Object.entries(p).forEach(([key, value]) => {
-				if (props[key]) props[key] = value;
+				if (value == undefined || isNaN(value)) return;
+				else if (props[key]) props[key] = value;
 			});
 		});
 		update.next((e) => e + 1);
 	});
 
-	let drawCircleDocFn = (x, y) => (doc) => {
-		doc.save();
+	// remove this and make it a runna function
 
-		doc.lineWidth(props.strokeWeight);
-		if (!x) x = props.x;
-		if (!y) y = props.y;
-		doc.circle(x, y, size.value() / 5);
-		if (props.stroke) doc.stroke(props.stroke);
-		if (props.fill) doc.fill(props.fill);
+	// Assume this function can take all props and just return the data you need
+	let tempFn = (p) => ["Circle", { ...props, ...p }];
 
-		doc.restore();
-	};
-
+	// to render vibes
 	let drawCircleFn = (x, y) => (ctx) => {
 		if (!x) x = props.x;
 		if (!y) y = props.y;
 		ctx.strokeStyle = "black";
 		ctx.strokeWidth = 8;
 		ctx.beginPath();
-		ctx.arc(x, y, size.value() / 2, 0, 2 * Math.PI);
+		ctx.arc(x, y, props.width, 0, 2 * Math.PI);
 		ctx.stroke();
 	};
 
-	let size = reactive(50);
 	let update = reactive(0);
 
-	let slider = ["input", {
-		type: "range",
-		min: 1,
-		max: 450,
-		oninput: (e) => {
-			size.next(e.target.value);
-		},
-	}];
-
 	memo(() => {
-		if (!outputBuffer.value()) return;
-		outputBuffer.value().forEach((id) => {
+		if (!outputBuffers.value()) return;
+		outputBuffers.value().forEach((id) => {
 			store.apply(["buffers", id], "set", [node.id, {
-				draw: drawCircleDocFn(),
+				// this should be a runa element instead of a function
+				draw: tempFn(),
 			}], false);
 		});
-	}, [outputBuffer, size, update]);
+	}, [outputBuffers, update]);
 
+	// This stuff should be on the outside
 	let style = memo(
 		() => CSSTransform(left, top, width, height) + Color(color.value()),
 		[left, top, width, height, color],
 	);
-
 	let onstart = (e) => {
+		addToSelection(node, e);
 		store.startBatch();
 
 		left.next(left.value());
@@ -283,9 +304,8 @@ export const renderCircle = (node) => {
 		".draggable.node",
 		{ style },
 		node.id,
-		slider,
-		...edges,
 		canvas,
+		...edges,
 		...connects,
 	);
 
@@ -294,7 +314,7 @@ export const renderCircle = (node) => {
 	memo(() => {
 		ctx.clearRect(0, 0, width.value(), height.value());
 		drawCircleFn(width.value() / 2, height.value() / 2)(ctx);
-	}, [width, height, size, inputs]);
+	}, [width, height, inputs]);
 
 	// Door
 
@@ -361,6 +381,7 @@ export const renderNumberPropFn = (key) => (node) => {
 	);
 
 	let onstart = (e) => {
+		addToSelection(node, e);
 		store.startBatch();
 
 		left.next(left.value());
@@ -399,6 +420,113 @@ export const renderNumberPropFn = (key) => (node) => {
 			},
 		});
 	}, 50);
+
+	return el;
+};
+
+const mapRange = (value, inMin, inMax, outMin, outMax) =>
+	(value - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
+
+export let sliderAxis = (key, axis = "horizontal") => (node) => {
+	let min = 1;
+	let max = 100;
+	let value = 14;
+	let label = key;
+
+	let r = R(getNodeLocation(node.id), node.id);
+
+	let left = r("x");
+	let top = r("y");
+	let height = r("height");
+	let width = r("width");
+	let color = r("color");
+
+	let dimensionmax = axis == "horizontal" ? width.value() : height.value();
+	// let mapper = (v) => mapRange(v, 0, dimensionmax, min, max);
+	let reversemapper = (v) => {
+		let f = mapRange(v, min, max, 0, dimensionmax);
+		console.log(f);
+		return f;
+	};
+
+	let x = reactive(reversemapper(value));
+
+	let outputs = {
+		isReactive: true,
+		value: () => store.get(EDGEMAP.concat([node.id])),
+		subscribe: (fn) => store.subscribe(EDGEMAP.concat([node.id]), fn),
+	};
+
+	let outputBuffer = memo(() => outputs.value().map((e) => e.blockId), [
+		outputs,
+	]);
+
+	let style = memo(
+		() => CSSTransform(left, top, width, height) + Color(color.value()),
+		[left, top, width, height, color],
+	);
+
+	memo(() => {
+		if (!outputBuffer.value()) return;
+		let v = () => {
+			let obj = {};
+			console.log(x.value());
+			obj[key] = x.value();
+			return obj;
+		};
+
+		outputBuffer.value().forEach((id) => {
+			store.apply(["buffers", id], "set", [node.id, v()], false);
+		});
+	}, [outputBuffer, x]);
+
+	let onstart = (e) => {
+		addToSelection(node, e);
+		store.startBatch();
+
+		left.next(left.value());
+		top.next(top.value());
+		width.next(width.value());
+		height.next(height.value());
+
+		store.endBatch();
+		store.pauseTracking();
+	};
+	let onend = () => {
+		store.resumeTracking();
+	};
+
+	let edges = resizers(left, top, width, height, { onstart, onend });
+	let connects = connectors(node, left, top, width, height);
+
+	// if (input) input.subscribe((v) => x.next(reversemapper(v)));
+	// if (output) x.subscribe((v) => output.next(mapper(v)));
+
+	let stylememo = memo(() => `
+		left: ${axis == "horizontal" ? x.value() : -8}px;
+		top:  ${axis == "vertical" ? x.value() : -8}px;`, [x]);
+
+	let cursor = dom([".psuedo-cursor.flex-center", { style: stylememo }, label]);
+	let el = dom([
+		".psuedo-slider",
+		{ style },
+		cursor,
+		...edges,
+		...connects,
+	]);
+
+	setTimeout(() => {
+		let set_left = (v) => axis == "horizontal" ? x.next(v) : null;
+		let set_top = (v) => axis == "vertical" ? x.next(v) : null;
+
+		drag(cursor, { set_left, set_top });
+		drag(el, {
+			set_left: (v) => left.next(v),
+			set_top: (v) => top.next(v),
+			onstart,
+			onend,
+		});
+	}, 100);
 
 	return el;
 };

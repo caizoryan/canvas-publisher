@@ -4,25 +4,26 @@
 // and send back an element.
 
 export let createRegistery = () => {
-	let components = {}
+	let components = {};
 
 	let register = (name, inputs, outputs, renderer) => {
-		if (components[name]) console.error("Cant Make duplicates")
+		if (components[name]) console.error("Cant Make duplicates");
 		components[name] = {
-			inputs, outputs, renderer
-		}
-	}
+			inputs,
+			outputs,
+			renderer,
+		};
+	};
 
 	let render = (node) => {
-		console.log(node)
-		let {renderer, inputs, outputs} = components[node.type] 
-		if (!renderer) return 
+		let { renderer, inputs, outputs } = components[node.type];
+		if (!renderer) return;
 		// can also do some additional stuff like making them draggable and attaching connection points, etc
 		// for inputs and outputs, the renderers are responsible to query and subscribe to the stores for their data.
 		// or should the registery handle it? since it is handling the drag and stuff.
 		// maybe can do that later...
-		else return renderer(node)
-	}
+		else return renderer(node);
+	};
 
-	return {register, render}
-}
+	return { register, render };
+};

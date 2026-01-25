@@ -47,6 +47,15 @@ export const isRectContained = (rect1, rect2) => {
 		rect2.y + rect2.height <= rect1.y + rect1.height
 	);
 };
+
+export const isRectIntersecting = (rect1, rect2) => {
+	return !(
+		rect1.x + rect1.width <= rect2.x ||
+		rect1.x >= rect2.x + rect2.width ||
+		rect1.y + rect1.height <= rect2.y ||
+		rect1.y >= rect2.y + rect2.height
+	);
+};
 const convertBlockToV3 = (block) => {
 	if (block.class) {
 		block.type = block.class;
@@ -152,6 +161,7 @@ export function BlockElement(block) {
 	);
 
 	let addToSelection = (e) => {
+		console.log("Changing?", [block.id]);
 		if (e.shiftKey) state.selected.next((e) => [...e, block.id]);
 		else state.selected.next([block.id]);
 	};
@@ -196,6 +206,7 @@ export function BlockElement(block) {
 	if (components && components["wordCount"]) { }
 
 	let onstart = (e) => {
+		console.log("Ok?");
 		addToSelection(e);
 		store.startBatch();
 		// saves this location for undo
@@ -263,14 +274,17 @@ export function GroupElement(group) {
 
 	let onstart = (e) => {
 		state.selected.next([]);
-
+		//
 		// saves this location for undo
 		store.startBatch();
 
 		if (!e.metaKey) {
 			store.get(["data", "nodes"]).forEach((e, i) => {
+				let fn = isRectIntersecting;
+				if (e.type == "group") fn = isRectContained;
+
 				if (
-					isRectContained(
+					fn(
 						Transform(
 							left.value(),
 							top.value(),

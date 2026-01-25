@@ -92,6 +92,14 @@ let pasteInBlock = () => {
 	);
 };
 
+let copySelection = () => {
+	let text = state.selected.value().map((e) => "https://are.na/block/" + e)
+		.join("/n");
+
+	console.log(text);
+	navigator.clipboard.writeText(text);
+};
+
 // --------------------
 // ACTIONS
 // --------------------
@@ -425,6 +433,12 @@ keys.on("cmd + v", pasteInBlock, {
 	disable_in_input: true,
 	preventDefault: true,
 });
+
+keys.on("cmd + c", copySelection, {
+	disable_in_input: true,
+	preventDefault: true,
+});
+
 keys.on("cmd + d", downloadData, {
 	disable_in_input: true,
 	preventDefault: true,

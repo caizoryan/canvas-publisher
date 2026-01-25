@@ -15,7 +15,12 @@ import { svgline, svgrect, svgrectnormal } from "./svg.js";
 import { dragTransforms } from "./dragOperations.js";
 import { mountBoundingBox } from "./bigBoundingBox.js";
 import { createRegistery } from "./registery.js";
-import { renderCanvas, renderCircle, renderNumberPropFn } from "./canvas.js";
+import {
+	renderCanvas,
+	renderCircle,
+	renderNumberPropFn,
+	sliderAxis,
+} from "./canvas.js";
 
 let stringify = JSON.stringify;
 export let mouse = reactive({ x: 0, y: 0 });
@@ -154,8 +159,11 @@ function makeXMarker(size = 1, id = "x", color = "black", strokeWidth = 2) {
 export let registery = createRegistery();
 registery.register("canvas", {}, {}, renderCanvas);
 registery.register("circle", {}, {}, renderCircle);
-registery.register("x", {}, {}, renderNumberPropFn("x"));
-registery.register("y", {}, {}, renderNumberPropFn("y"));
+registery.register("x", {}, {}, sliderAxis("x"));
+registery.register("y", {}, {}, sliderAxis("y", "vertical"));
+
+// registery.register("x", {}, {}, renderNumberPropFn("x"));
+// registery.register("y", {}, {}, renderNumberPropFn("y", "vertical"));
 registery.register("strokeWeight", {}, {}, renderNumberPropFn("strokeWeight"));
 
 store.subscribe(["data", "nodes"], (e) => {
@@ -291,7 +299,6 @@ export let removeEdge = (edge) => {
 	state.reRenderEdges.next((e) => e + .0001);
 };
 export let updateBuffers = () => {
-	console.log("ASS FUCKER FUCKKKKKK");
 	// everytime nodes or edges change check if new nodes exist
 	// if new node exists then add a buffer for it
 
@@ -325,24 +332,18 @@ export let updateBuffers = () => {
 			dontExistEdgeMap = dontExistEdgeMap.filter((e) => e != node.id);
 			return;
 		} else {
-			console.log("Edge doesn't exist", node.id, dontExistEdgeMap);
 			addEdgeMap(node.id);
 		}
 	});
 
-	console.log("ASS GUCKER 2");
 	Object.entries(edgeMap).forEach(([id, nodes]) => {
-		console.log("ASS GUCKER 2.5", id, nodes.length, nodes);
 		let toRemove = [];
 		let blockIdToRemove = [];
 		nodes.forEach(({ edgeId, blockId }) => {
-			console.log("ASS GUCKER 3");
 			// check if edge still exists
 			if (edgeIds.includes(edgeId)) {
 				// do nothing
-				console.log("Edge still exists", edgeId, edgeIds);
 			} else {
-				console.log("Edge was removed", edgeId);
 				// mark this entry to be removed
 				toRemove.push(edgeId);
 				blockIdToRemove.push(blockId);
@@ -354,10 +355,7 @@ export let updateBuffers = () => {
 		let newLocations = nodes.filter((f) => !(toRemove.includes(f.edgeId)));
 		store.apply(EDGEMAP, "set", [id, newLocations]);
 		blockIdToRemove.forEach((blockId) => {
-			console.log("To removes: ", blockId);
-			console.log("deleting", id, "from", blockId);
 			store.apply(BUFFERS.concat([blockId]), "set", [id, undefined]);
-			console.log(store.get(BUFFERS.concat([blockId, id])));
 		});
 
 		// also delete values from from
@@ -365,7 +363,6 @@ export let updateBuffers = () => {
 
 	edges.forEach((edge) => {
 		let from = store.get(EDGEMAP.concat(edge.fromNode));
-		console.log("fromNode", edge.fromNode, from);
 
 		let found = from.findIndex((e) => e.edgeId == edge.id);
 		if (found == -1) {
@@ -373,13 +370,6 @@ export let updateBuffers = () => {
 				edgeId: edge.id,
 				blockId: edge.toNode,
 			});
-			console.log(
-				"Connected ",
-				edge.fromNode,
-				" to ",
-				edge.toNode,
-				store.get(EDGEMAP.concat(edge.fromNode)),
-			);
 		}
 	});
 
@@ -388,7 +378,6 @@ export let updateBuffers = () => {
 	// dontExistBuffers.forEach(e =>
 	// 	removeBuffer(e)
 	// )
-	console.log(edgeMap);
 };
 
 export let getNodeLocation = (id) => store.get(NODEHASH)[id];
@@ -496,65 +485,89 @@ let R = (location) => ({
 	subscribe: (fn) => store.subscribe(location, fn),
 });
 
+let boundingToSide = (b, side) => {
+	let s = 10;
+	if (side == "top") {
+		return ({
+			x: b.x + b.width / 2,
+			y: b.y - s,
+		});
+	}
+
+	if (side == "bottom") {
+		return ({
+			x: b.x + b.width / 2,
+			y: b.y + b.height + s,
+		});
+	}
+
+	if (side == "right") {
+		return ({
+			x: b.x + b.width + s,
+			y: b.y + b.height / 2,
+		});
+	}
+
+	if (side == "left") {
+		return ({
+			x: b.x - s,
+			y: b.y + b.height / 2,
+		});
+	}
+};
+
 let edges = memo(() => {
 	if (!store.get(["data", "edges"])) return [];
 	return store.get(["data", "edges"]).map((e) => {
-		console.log("running");
-
-		let boundingToSide = (b, side) => {
-			let s = 10;
-			if (side == "top") {
-				return ({
-					x: b.x + b.width / 2,
-					y: b.y - s,
-				});
-			}
-
-			if (side == "bottom") {
-				return ({
-					x: b.x + b.width / 2,
-					y: b.y + b.height + s,
-				});
-			}
-
-			if (side == "right") {
-				return ({
-					x: b.x + b.width + s,
-					y: b.y + b.height / 2,
-				});
-			}
-
-			if (side == "left") {
-				return ({
-					x: b.x - s,
-					y: b.y + b.height / 2,
-				});
-			}
-		};
-
 		let from = store.get(["data", "nodes"]).find((f) => f.id == e.fromNode);
 		let to = store.get(["data", "nodes"]).find((f) => f.id == e.toNode);
 
 		if (!(from && to)) return;
-		// let to = store.get(getNodeLocation(e.toNode))
+
+		let selection = state.selected.value().reduce((acc, f) => {
+			console.log("acc", acc, f);
+			if (acc) {
+				console.log("selected: ", f);
+				return acc;
+			} else {
+				if (e.fromNode == f) return true;
+				else if (e.toNode == f) return true;
+				else return false;
+			}
+		}, false);
 
 		let fromT = boundingToSide(from, e.fromSide);
 		let toT = boundingToSide(to, e.toSide);
 
-		return svgline(fromT.x, fromT.y, toT.x, toT.y, "black", 8, 0, {
-			class: "connection-line",
-			onmouseenter: () => {
-				state.selected_connection = e;
+		return svgline(
+			fromT.x,
+			fromT.y,
+			toT.x,
+			toT.y,
+			selection ? "#88f" : "#ddd",
+			5,
+			// 5,
+			0,
+			{
+				class: "connection-line",
+				onmouseenter: () => {
+					state.selected_connection = e;
+				},
+				onmouseexit: () => {
+					state.selected_connection = undefined;
+				},
 			},
-			onmouseexit: () => {
-				state.selected_connection = undefined;
-			},
-		});
+		);
 	}).filter((e) => e != undefined);
 }, [
 	R(["data", "edges"]),
 	state.reRenderEdges,
 ]);
+
+state.selected.subscribe(() => {
+	console.log("burrd");
+	state.reRenderEdges.next((e) => e + 1);
+});
 
 let currentConnection = svgline(
 	state.connectionFromX,
