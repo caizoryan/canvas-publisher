@@ -16,11 +16,13 @@ import { dragTransforms } from "./dragOperations.js";
 import { mountBoundingBox } from "./bigBoundingBox.js";
 import { createRegistery } from "./registery.js";
 import {
+	add,
+	objectPlexer,
 	renderCanvas,
 	renderCircle,
-	renderNumberPropFn,
 	sliderAxis,
 } from "./canvas.js";
+import { V } from "./schema.js";
 
 let stringify = JSON.stringify;
 export let mouse = reactive({ x: 0, y: 0 });
@@ -157,14 +159,72 @@ function makeXMarker(size = 1, id = "x", color = "black", strokeWidth = 2) {
 }
 
 export let registery = createRegistery();
-registery.register("canvas", {}, {}, renderCanvas);
-registery.register("circle", {}, {}, renderCircle);
-registery.register("x", {}, {}, sliderAxis("x"));
-registery.register("y", {}, {}, sliderAxis("y", "vertical"));
+registery.register(
+	"canvas",
+	{
+		draw: V.array().collect(),
+	},
+	{},
+	renderCanvas,
+);
+registery.register(
+	"circle",
+	{
+		x: V.number(Math.random() * 500),
+		y: V.number(Math.random() * 500),
+		radius: V.number(50),
+		strokeWeight: V.number(1),
+		fill: V.string("#cccccc"),
+		stroke:
+			// v.or(v.string('black'), v.array([0,0,0,100]))
+			V.string("black"),
+	},
+	{},
+	renderCircle,
+	(props) => ({
+		draw: ["Circle", props],
+	}),
+);
 
-// registery.register("x", {}, {}, renderNumberPropFn("x"));
-// registery.register("y", {}, {}, renderNumberPropFn("y", "vertical"));
-registery.register("strokeWeight", {}, {}, renderNumberPropFn("strokeWeight"));
+// registery.register("slider", {}, {}, sliderAxis("x"));
+
+registery.register(
+	"Object",
+	{
+		key: V.string("x"),
+		value: V.number(0),
+	},
+	{},
+	objectPlexer,
+	(props) => {
+		const o = {};
+		o[props.key] = props.value;
+		return o;
+	},
+);
+
+registery.register(
+	"add",
+	{
+		value: V.number(0).collect(),
+	},
+	{},
+	add,
+	(props) => {
+		let val = props.value.reduce((acc, v) => acc += v, 0);
+		return val;
+	},
+);
+
+registery.register(
+	"slider",
+	{ value: V.number(10) },
+	{},
+	sliderAxis(),
+	(props) => {
+		return props;
+	},
+);
 
 store.subscribe(["data", "nodes"], (e) => {
 	// because we said children updates are true,
@@ -238,15 +298,15 @@ export let subscribeToId = (id, location, fn) => {
 };
 
 export let addEdgeMap = (id) => {
-	store.tr(EDGEMAP, "set", [id, []]);
+	store.tr(EDGEMAP, "set", [id, []], false);
 };
 
 export let addBuffer = (id) => {
-	store.tr(BUFFERS, "set", [id, {}]);
+	store.tr(BUFFERS, "set", [id, {}], false);
 };
 export let removeBuffer = (id) => {
 	// just set to undefined
-	store.tr(BUFFERS, "set", [id, undefined]);
+	store.tr(BUFFERS, "set", [id, undefined], false);
 };
 
 export let setNodes = (nodes) => {
@@ -259,9 +319,12 @@ export let addNode = (node) => {
 	updateNodeHash();
 
 	setTimeout(() => {
-		let el = registery.render(node);
+		// this can be called like a mount or smth?
+		// will check if data is initialized, if not will do that
+		//
+		let el = registery.mount(node);
 		if (el) document.querySelector(".container").appendChild(el);
-	}, 100);
+	}, 10);
 };
 export let removeNode = (node) => {
 	let index = store.get(NODES).findIndex((e) => e.id == node.id);
@@ -353,9 +416,9 @@ export let updateBuffers = () => {
 		});
 
 		let newLocations = nodes.filter((f) => !(toRemove.includes(f.edgeId)));
-		store.apply(EDGEMAP, "set", [id, newLocations]);
+		store.apply(EDGEMAP, "set", [id, newLocations], false);
 		blockIdToRemove.forEach((blockId) => {
-			store.apply(BUFFERS.concat([blockId]), "set", [id, undefined]);
+			store.apply(BUFFERS.concat([blockId]), "set", [id, undefined], false);
 		});
 
 		// also delete values from from
@@ -369,7 +432,7 @@ export let updateBuffers = () => {
 			store.apply(EDGEMAP.concat(edge.fromNode), "push", {
 				edgeId: edge.id,
 				blockId: edge.toNode,
-			});
+			}, false);
 		}
 	});
 
@@ -565,7 +628,6 @@ let edges = memo(() => {
 ]);
 
 state.selected.subscribe(() => {
-	console.log("burrd");
 	state.reRenderEdges.next((e) => e + 1);
 });
 
@@ -596,9 +658,11 @@ let updateData = (blocks) => {
 	state.dot_book = blocks.find((e) => e.title == ".book");
 	if (state.dot_book) {
 		let parsed = JSON.parse(state.dot_book.content.plain);
+		store.pauseTracking();
 		parsed.nodes.forEach((f) => addNode(f));
 		parsed.edges.forEach((f) => addEdge(f));
 		updateNodeHash();
+		store.resumeTracking();
 
 		// if data has blocks that aren't in blocks... remove them
 		// let updateHash = false

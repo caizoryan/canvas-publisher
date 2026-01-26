@@ -13,7 +13,6 @@ import {
 	CSSTransform,
 } from "./block.js";
 import { helpbar } from "./help.js";
-import { history } from "./history.js";
 import { extract_block_id, link_is_block } from "./md.js";
 
 // first order of business
@@ -183,7 +182,7 @@ const helpbtn = button(
 	() => state.helpOpen.next((e) => !e),
 );
 
-const buttons = [".main-buttons", savebtn, openbtn, helpbtn, history()];
+const buttons = [".main-buttons", savebtn, openbtn, helpbtn];
 
 // --------------------
 // Move this somewhere
@@ -385,7 +384,7 @@ document.addEventListener("wheel", (e) => {
 	}
 }, { passive: false });
 
-let keys = new Keymanager();
+export let keys = new Keymanager();
 let prevent = { preventDefault: true };
 
 keys.on("cmd + z", undo, prevent);
@@ -405,24 +404,26 @@ keys.on("b", vistLast, { modifiers: false, disable_in_input: true });
 keys.on("t", toggleTrackingMode, { disable_in_input: true });
 
 //TEMPORARAY
-keys.on("x", () => state.making_node = "x", {
+keys.on("x", () => state.making_node = "slider", {
 	modifiers: false,
 	disable_in_input: true,
 });
-keys.on("y", () => state.making_node = "y", {
+
+keys.on("o", () => state.making_node = "Object", {
 	modifiers: false,
 	disable_in_input: true,
 });
+
+keys.on("a", () => state.making_node = "add", {
+	modifiers: false,
+	disable_in_input: true,
+});
+
 keys.on("c", () => state.making_node = "circle", {
 	modifiers: false,
 	disable_in_input: true,
 });
 keys.on("s", () => state.making_node = "canvas", {
-	modifiers: false,
-	disable_in_input: true,
-});
-
-keys.on("w", () => state.making_node = "strokeWeight", {
 	modifiers: false,
 	disable_in_input: true,
 });
