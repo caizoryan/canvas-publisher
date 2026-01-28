@@ -19,7 +19,7 @@ import {
 	subscribeToId,
 } from "./state.js";
 
-let nodeContainer = (node, children) => {
+let nodeContainer = (node, attr, children) => {
 	let r = R(getNodeLocation(node.id), node.id);
 
 	let left = r("x");
@@ -82,7 +82,7 @@ let nodeContainer = (node, children) => {
 
 	let el = dom(
 		".draggable.node",
-		{ style },
+		{ style, ...attr },
 		...edges,
 		...connects,
 		...children,
@@ -110,6 +110,15 @@ export let createRegistery = () => {
 
 		let _inputs = reactive({});
 		store.subscribe(BUFFERS.concat([node.id]), (e) => _inputs.next(e));
+		let timeout;
+		let activated = reactive(false);
+		_inputs.subscribe(() => {
+			if (timeout) clearTimeout(timeout);
+			activated.next(true);
+			timeout = setTimeout(() => {
+				activated.next(false);
+			}, 500);
+		});
 
 		if (inputs) {
 			// initialize inputs
@@ -130,8 +139,24 @@ export let createRegistery = () => {
 				if (value.collects) props[key] = [];
 			});
 
-			Object.values(_inputs.value()).forEach((p) => {
+			let inputToSort = _inputs.value();
+			// sort inputs first based on edges
+			// not sure how this will work...
+			let sorted = {};
+			let edgesCopy = store.get(["data", "edges"]);
+			Object.entries(_inputs.value()).forEach(([key, value]) => {
+				let edge = store.get(["edgeMap", key]).find((e) =>
+					e.blockId == node.id
+				);
+				let edgeId;
+				if (edge) edgeId = edge.edgeId;
+				let position = edgesCopy.findIndex((e) => e.id == edgeId);
+				sorted[position + ""] = value;
+			});
+
+			Object.values(sorted).forEach((p) => {
 				if (!p) return;
+
 				Object.entries(p).forEach(([key, value]) => {
 					if (value == undefined) {
 						return;
@@ -175,17 +200,13 @@ export let createRegistery = () => {
 		}
 
 		if (!renderer) return;
-		// can also do some additional stuff like making them draggable and attaching connection points, etc
-		// for inputs and outputs, the renderers are responsible to query and subscribe to the stores for their data.
-		// or should the registery handle it? since it is handling the drag and stuff.
-		// maybe can do that later...
-		//
 		else {
 			let rendered = renderer(node, inputParsed, updateBuffers);
-			if (Array.isArray(rendered)) return nodeContainer(node, rendered);
-			else return rendered;
+			if (Array.isArray(rendered)) {
+				return nodeContainer(node, { activated }, rendered);
+			} else return rendered;
 		}
 	};
 
-	return { register, mount: mount };
+	return { register, mount };
 };

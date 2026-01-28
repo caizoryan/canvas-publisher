@@ -14,6 +14,7 @@ import {
 } from "./block.js";
 import { helpbar } from "./help.js";
 import { extract_block_id, link_is_block } from "./md.js";
+import { pinnedCanvas } from "./canvas.js";
 
 // first order of business
 // 1. Get canvas showing and moving like before
@@ -332,6 +333,7 @@ export let mountContainer = (children) => {
 	// ---------
 	// MOUNT
 	// ~~~~~~~~~
+	document.body.appendChild(pinnedCanvas);
 	document.body.appendChild(root);
 	// ---------
 };
@@ -423,6 +425,12 @@ keys.on("c", () => state.making_node = "circle", {
 	modifiers: false,
 	disable_in_input: true,
 });
+
+keys.on("l", () => state.making_node = "colorSliders", {
+	modifiers: false,
+	disable_in_input: true,
+});
+
 keys.on("s", () => state.making_node = "canvas", {
 	modifiers: false,
 	disable_in_input: true,

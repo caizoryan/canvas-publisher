@@ -17,6 +17,7 @@ import { mountBoundingBox } from "./bigBoundingBox.js";
 import { createRegistery } from "./registery.js";
 import {
 	add,
+	colorSliders,
 	objectPlexer,
 	renderCanvas,
 	renderCircle,
@@ -39,6 +40,8 @@ export let state = {
 	recentSlugs: reactive([]),
 	currentSlug: reactive("are-na-canvas"),
 	selected: reactive([]),
+	// could make this to make multiple pins
+	pinnedNode: reactive(0),
 
 	containerMouseX: reactive(0),
 	containerMouseY: reactive(0),
@@ -166,6 +169,9 @@ registery.register(
 	},
 	{},
 	renderCanvas,
+	(props) => {
+		return { draw: ["Group", props.draw] };
+	},
 );
 registery.register(
 	"circle",
@@ -174,7 +180,7 @@ registery.register(
 		y: V.number(Math.random() * 500),
 		radius: V.number(50),
 		strokeWeight: V.number(1),
-		fill: V.string("#cccccc"),
+		fill: V.array([0, 0, 50, 15]),
 		stroke:
 			// v.or(v.string('black'), v.array([0,0,0,100]))
 			V.string("black"),
@@ -204,6 +210,24 @@ registery.register(
 );
 
 registery.register(
+	"colorSliders",
+	{
+		c: V.number(0),
+		m: V.number(0),
+		y: V.number(0),
+		k: V.number(0),
+	},
+	{},
+	colorSliders,
+	(props) => {
+		const o = {
+			fill: [props.c, props.m, props.y, props.k],
+		};
+		return o;
+	},
+);
+
+registery.register(
 	"add",
 	{
 		value: V.number(0).collect(),
@@ -212,7 +236,7 @@ registery.register(
 	add,
 	(props) => {
 		let val = props.value.reduce((acc, v) => acc += v, 0);
-		return val;
+		return { value: val };
 	},
 );
 
@@ -252,7 +276,6 @@ export let NODEHASH = ["data", "nodeHash"];
 export let NODEAT = (i) => NODES.concat([i]);
 
 store.subscribe(EDGES, () => state.reRenderEdges.next((e) => e + .0001));
-
 store.subscribe(NODES, () => updateBuffers());
 store.subscribe(EDGES, () => updateBuffers());
 
@@ -579,6 +602,9 @@ let boundingToSide = (b, side) => {
 	}
 };
 
+// have to change this to be the same way nodes are
+// WE DONT WANNA MAKE NEW SVG LINES EVERY UPDATE!!!
+// THIS IS HORRIBLE
 let edges = memo(() => {
 	if (!store.get(["data", "edges"])) return [];
 	return store.get(["data", "edges"]).map((e) => {
@@ -588,13 +614,11 @@ let edges = memo(() => {
 		if (!(from && to)) return;
 
 		let selection = state.selected.value().reduce((acc, f) => {
-			console.log("acc", acc, f);
 			if (acc) {
-				console.log("selected: ", f);
 				return acc;
 			} else {
-				if (e.fromNode == f) return true;
-				else if (e.toNode == f) return true;
+				if (e.fromNode == f) return "#88f";
+				else if (e.toNode == f) return "#f88";
 				else return false;
 			}
 		}, false);
@@ -607,7 +631,7 @@ let edges = memo(() => {
 			fromT.y,
 			toT.x,
 			toT.y,
-			selection ? "#88f" : "#ddd",
+			selection ? selection : "#ddd",
 			5,
 			// 5,
 			0,
