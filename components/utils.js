@@ -113,6 +113,40 @@ export let sub = (node, inputs, updateOut) => {
 	return [cursor];
 };
 
+export let mul = (node, inputs, updateOut) => {
+	// Make an R out of key
+	let update = inputs;
+	let props = getProps(node.id);
+	let val = reactive(
+		props.value.reduce((acc, v, i) => i == 0 ? acc = v : acc -= v, 0),
+	);
+
+	update.subscribe(() => {
+		props = getProps(node.id);
+		val.next(
+			props.value.reduce((acc, v, i) => i == 0 ? acc = v : acc -= v, 0)
+				.toFixed(2),
+		);
+	});
+
+	let r = dataR(getNodeLocation(node.id), node.id);
+	let key = r("start");
+
+	let input = dom(["input", {
+		type: "number",
+		value: key,
+		oninput: (e) => {
+			let num = parseFloat(e.target.value.trim());
+			if (typeof num == "number") key.next(num);
+			updateOut();
+		},
+	}, key]);
+
+	let cursor = dom(["code", input, " * ", ["span", val]]);
+
+	return [cursor];
+};
+
 let sliderAxis = (axis = "horizontal") => (node, ins, updateOut) => {
 	let props = getProps(node.id);
 	let value = props.value ? props.value : 1;
@@ -239,10 +273,22 @@ export let ReadVariable = {
 	inputs: { value: V.any({}) },
 	outputs: {},
 	transform: (props) => {
-		console.log("Recieving", props);
 		if (!props?.value?.value) return {};
 		else if (typeof props.value.value == "object") {
 			return { ...props.value.value };
+		} else return {};
+	},
+};
+
+export let CompileObject = {
+	id: "ObjectMerge",
+	render: () => [dom(["span", " {...} "])],
+	inputs: "ANY",
+	outputs: {},
+	transform: (props) => {
+		if (!props) return {};
+		else if (typeof props == "object") {
+			return { ...props };
 		} else return {};
 	},
 };
@@ -267,6 +313,19 @@ export let MathComps = {
 			value: props.value.reduce(
 				(acc, v, i) => i == 0 ? acc = v : acc -= v,
 				0,
+			),
+		}),
+	},
+
+	mul: {
+		id: "mul",
+		render: mul,
+		inputs: { value: V.number(0).collect(), start: V.number(1) },
+		outputs: {},
+		transform: (props) => ({
+			value: props.value.reduce(
+				(acc, v) => acc *= v,
+				props.start,
 			),
 		}),
 	},

@@ -12,6 +12,7 @@ import { createRegistery } from "./registery.js";
 import {
 	add,
 	colorSliders,
+	CompileObject,
 	CreateVariable,
 	MathComps,
 	ObjectLabeller,
@@ -178,9 +179,11 @@ registery.register(Circle);
 registery.register(ObjectLabeller);
 registery.register(MathComps.add);
 registery.register(MathComps.sub);
+registery.register(MathComps.mul);
 registery.register(Slider);
 registery.register(CreateVariable);
 registery.register(ReadVariable);
+registery.register(CompileObject);
 
 registery.register(
 	"colorSliders",
