@@ -3,13 +3,7 @@ import { memo, reactive } from "./chowk.js";
 import { get_channel, try_auth } from "./arena.js";
 import { notificationpopup } from "./notification.js";
 import { mountContainer } from "./script.js";
-import {
-	BlockElement,
-	connectors,
-	constructBlockData,
-	GroupElement,
-	unwrap,
-} from "./block.js";
+import { unwrap } from "./block.js";
 import { createStore } from "./store.js";
 import { svgline, svgrect, svgrectnormal } from "./svg.js";
 import { dragTransforms } from "./dragOperations.js";
@@ -18,12 +12,16 @@ import { createRegistery } from "./registery.js";
 import {
 	add,
 	colorSliders,
-	objectPlexer,
-	renderCanvas,
-	renderCircle,
-	sliderAxis,
-} from "./canvas.js";
+	CreateVariable,
+	MathComps,
+	ObjectLabeller,
+	ReadVariable,
+	Slider,
+} from "./components/utils.js";
+import { renderCanvas } from "./canvas.js";
 import { V } from "./schema.js";
+
+import { Circle } from "./components/shapes.js";
 
 let stringify = JSON.stringify;
 export let mouse = reactive({ x: 0, y: 0 });
@@ -40,6 +38,7 @@ export let state = {
 	recentSlugs: reactive([]),
 	currentSlug: reactive("are-na-canvas"),
 	selected: reactive([]),
+	selectedConnection: reactive([]),
 	// could make this to make multiple pins
 	pinnedNode: reactive(0),
 
@@ -78,6 +77,8 @@ export let store = createStore({
 	nodeHash: {},
 	buffers: {},
 	edgeMap: {},
+	// will be stored as {[name] : {value, sourceId}}
+	variables: {},
 });
 
 function makeLineArrowMarker(
@@ -173,41 +174,13 @@ registery.register(
 		return { draw: ["Group", props.draw] };
 	},
 );
-registery.register(
-	"circle",
-	{
-		x: V.number(Math.random() * 500),
-		y: V.number(Math.random() * 500),
-		radius: V.number(50),
-		strokeWeight: V.number(1),
-		fill: V.array([0, 0, 50, 15]),
-		stroke:
-			// v.or(v.string('black'), v.array([0,0,0,100]))
-			V.string("black"),
-	},
-	{},
-	renderCircle,
-	(props) => ({
-		draw: ["Circle", props],
-	}),
-);
-
-// registery.register("slider", {}, {}, sliderAxis("x"));
-
-registery.register(
-	"Object",
-	{
-		key: V.string("x"),
-		value: V.number(0),
-	},
-	{},
-	objectPlexer,
-	(props) => {
-		const o = {};
-		o[props.key] = props.value;
-		return o;
-	},
-);
+registery.register(Circle);
+registery.register(ObjectLabeller);
+registery.register(MathComps.add);
+registery.register(MathComps.sub);
+registery.register(Slider);
+registery.register(CreateVariable);
+registery.register(ReadVariable);
 
 registery.register(
 	"colorSliders",
@@ -224,29 +197,6 @@ registery.register(
 			fill: [props.c, props.m, props.y, props.k],
 		};
 		return o;
-	},
-);
-
-registery.register(
-	"add",
-	{
-		value: V.number(0).collect(),
-	},
-	{},
-	add,
-	(props) => {
-		let val = props.value.reduce((acc, v) => acc += v, 0);
-		return { value: val };
-	},
-);
-
-registery.register(
-	"slider",
-	{ value: V.number(10) },
-	{},
-	sliderAxis(),
-	(props) => {
-		return props;
 	},
 );
 
@@ -314,7 +264,6 @@ let idSubscriptions = {};
 
 export let subscribeToId = (id, location, fn) => {
 	let l = getNodeLocation(id);
-	// TODO: Make removes...
 	let remove = store.subscribe(l.concat(location), fn);
 	if (idSubscriptions[id]) idSubscriptions[id].fns.push([fn]);
 	idSubscriptions[id] = { fns: [fn], location, remove };
@@ -378,8 +327,8 @@ export let addEdge = (edge) => {
 		state.reRenderEdges.next((e) => e + .0001);
 	} else notificationpopup("Connection Already Exists", true);
 };
-export let removeEdge = (edge) => {
-	let index = store.get(EDGES).findIndex((e) => e.id == edge.id);
+export let removeEdge = (edgeId) => {
+	let index = store.get(EDGES).findIndex((e) => e.id == edgeId);
 	if (index != -1) store.apply(EDGES, "remove", [index, 1]);
 
 	state.reRenderEdges.next((e) => e + .0001);
@@ -571,7 +520,7 @@ let R = (location) => ({
 	subscribe: (fn) => store.subscribe(location, fn),
 });
 
-let boundingToSide = (b, side) => {
+export let boundingToSide = (b, side) => {
 	let s = 10;
 	if (side == "top") {
 		return ({
@@ -632,17 +581,24 @@ let edges = memo(() => {
 			toT.x,
 			toT.y,
 			selection ? selection : "#ddd",
-			5,
+			8,
 			// 5,
 			0,
 			{
+				id: "edge-" + e.id,
 				class: "connection-line",
-				onmouseenter: () => {
-					state.selected_connection = e;
+				selected: memo(() => state.selectedConnection.value().includes(e.id), [
+					state.selectedConnection,
+				]),
+				onpointerdown: (event) => {
+					console.log("Clicked?");
+					if (event.shiftKey) {
+						state.selectedConnection.next((a) => [...a, e.id]);
+					} else state.selectedConnection.next([e.id]);
 				},
-				onmouseexit: () => {
-					state.selected_connection = undefined;
-				},
+				// onmouseexit: () => {
+				// 	state.selected_connection = undefined;
+				// },
 			},
 		);
 	}).filter((e) => e != undefined);

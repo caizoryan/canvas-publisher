@@ -6,7 +6,6 @@ import { dom } from "./dom.js";
 import { drag } from "./drag.js";
 import {
 	BUFFERS,
-	EDGEMAP,
 	getNodeLocation,
 	state,
 	store,
@@ -26,8 +25,6 @@ pinnedContext.beginPath();
 pinnedContext.rect(20, 20, 150, 100);
 pinnedContext.stroke();
 
-let updatePinned = (fn) => fn(pinnedContext, pinnedCanvas);
-
 let queued = {};
 try {
 	PDFJS.GlobalWorkerOptions.workerSrc = PDFWorker;
@@ -46,7 +43,7 @@ export let addToSelection = (block, e) => {
 export let R = (location, id) => (key) => ({
 	isReactive: true,
 	value: () => store.get(location.concat([key])),
-	next: (v) => store.tr(location, "set", [key, v], false),
+	next: (v, track = false) => store.tr(location, "set", [key, v], track),
 	subscribe: (fn) => subscribeToId(id, [key], fn),
 });
 
@@ -81,21 +78,18 @@ export const renderCanvas = (node, inputs) => {
 		var loadingTask = PDFJS.getDocument(url);
 		loadingTask.promise.then(
 			(pdf) => renderPDF(pdf, start, ctx),
-			(reason) => console.error(reason),
+			(reason) => console.log("All good", reason),
 		);
 	}
 
 	let renderPDF = (pdf, start, ctxx) => {
 		let end = new Date();
 		let ms = end.valueOf() - start.valueOf();
-		console.log("PDF loaded in", ms);
 
 		// Fetch the first page
 		let pageNumber = 1;
 		pdf.getPage(pageNumber).then(function(page) {
-			console.log("Page loaded");
 			let isPinnedTask = ctxx == pinnedContext;
-			if (isPinnedTask) console.log("IS PINNED TASK");
 			let scale = 1;
 			let viewport = page.getViewport({ scale: scale });
 
@@ -117,6 +111,7 @@ export const renderCanvas = (node, inputs) => {
 			let setTask = (t) => isPinnedTask ? pinnedTask = t : queued[node.id] = t;
 			setTask(renderTask);
 			renderTask.promise.then(() => setTask(undefined));
+			renderTask.promise.catch((e) => console.log("All good: ", e));
 		});
 	};
 
@@ -180,7 +175,6 @@ let drawCircleDocFn = (props) => (doc) => {
 	let x = props.x;
 	let y = props.y;
 	doc.circle(x, y, props.radius);
-	console.log("FIll is array", Array.isArray(props.fill), props.fill);
 	if (props.stroke && props.fill) doc.fillAndStroke(props.fill, props.stroke);
 	else {
 		if (props.stroke) doc.stroke(props.stroke);
@@ -192,184 +186,7 @@ let drawCircleDocFn = (props) => (doc) => {
 
 let getProps = (id) => store.get(getNodeLocation(id).concat(["data"]));
 
-export const renderCircle = (node, input, updateOut) => {
-	let r = R(getNodeLocation(node.id), node.id);
-
-	let height = r("height");
-	let width = r("width");
-
-	// // handling inputs and subscriptions
-	let inputs = reactive({});
-	//
-
-	store.subscribe(BUFFERS.concat([node.id]), (e) => inputs.next(e));
-
-	// to render vibes
-	let drawCircleFn = (x, y) => (ctx) => {
-		let props = getProps(node.id);
-
-		ctx.strokeStyle = "black";
-		ctx.strokeWidth = 8;
-		// also do fill
-
-		ctx.beginPath();
-		ctx.arc(x, y, props.radius, 0, 2 * Math.PI);
-		ctx.stroke();
-	};
-
-	let slider = dom(["input", {
-		type: "range",
-		min: 1,
-		max: 150,
-		step: 1,
-		oninput: (e) => {
-			let v = parseFloat(e.target.value);
-			store.apply(getNodeLocation(node.id).concat(["data"]), "set", [
-				"radius",
-				v,
-			], false);
-
-			updateOut();
-		},
-	}]);
-
-	// This stuff should be on the outside
-	let canvas = dom(["canvas", { width: width, height: height }]);
-	let ctx = canvas.getContext("2d");
-
-	memo(() => {
-		ctx.clearRect(0, 0, width.value(), height.value());
-		drawCircleFn(width.value() / 2, height.value() / 2)(ctx);
-	}, [width, height, inputs]);
-
-	return [slider, canvas];
-};
-
 const mapRange = (value, inMin, inMax, outMin, outMax) =>
 	(value - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
-
-export let sliderAxis = (axis = "horizontal") => (node, ins, updateOut) => {
-	let props = getProps(node.id);
-	let value = props.value ? props.value : 1;
-
-	ins.subscribe((v) => {
-		props = getProps(node.id);
-		if (props.value == undefined) return;
-		x.next(props.value);
-	});
-
-	let x = reactive(value);
-	x.subscribe((v) => {
-		store.apply(getNodeLocation(node.id).concat(["data"]), "set", [
-			"value",
-			v,
-		], false);
-		updateOut();
-	});
-
-	let stylememo = memo(() => `
-		left: ${axis == "horizontal" ? x.value() : -8}px;
-		top:  ${axis == "vertical" ? x.value() : -8}px;
-`, [x]);
-
-	let cursor = dom([
-		".psuedo-cursor.flex-center",
-		{ style: stylememo },
-	]);
-
-	setTimeout(() => {
-		let set_left = (v) => axis == "horizontal" ? x.next(v) : null;
-		let set_top = (v) => axis == "vertical" ? x.next(v) : null;
-
-		drag(cursor, { set_left, set_top });
-	}, 100);
-
-	return [cursor];
-};
-
-export let objectPlexer = (node, inputs, updateOut) => {
-	// Make an R out of key
-	let r = dataR(getNodeLocation(node.id), node.id);
-	let key = r("key");
-
-	let cursor = dom(["textarea", {
-		type: "text",
-		oninput: (e) => {
-			key.next(e.target.value.trim());
-			updateOut();
-		},
-	}, key]);
-
-	return [cursor];
-};
-
-export let colorSliders = (node, inputs, updateOut) => {
-	// Make an R out of key
-	let r = dataR(getNodeLocation(node.id), node.id);
-	let c = r("c");
-	let m = r("m");
-	let y = r("y");
-	let k = r("k");
-
-	let colorSlider = (v, color) => {
-		return ["input.color", {
-			type: "range",
-			min: 0,
-			max: 100,
-			step: 1,
-			oninput: (e) => {
-				v.next(parseFloat(e.target.value));
-				updateOut();
-			},
-		}];
-	};
-
-	function cmykToRgb(c, m, y, k) {
-		const r = Math.round(255 * (1 - c) * (1 - k));
-		const g = Math.round(255 * (1 - m) * (1 - k));
-		const b = Math.round(255 * (1 - y) * (1 - k));
-
-		return { r, g, b };
-	}
-
-	let box = [".color-box", {
-		style: memo(() => {
-			let { r, g, b } = cmykToRgb(
-				c.value() / 100,
-				m.value() / 100,
-				y.value() / 100,
-				k.value() / 100,
-			);
-
-			return `background-color: rgb(${r}, ${g}, ${b});`;
-		}, [c, m, y, k]),
-	}];
-
-	return [
-		colorSlider(c),
-		colorSlider(m),
-		colorSlider(y),
-		colorSlider(k),
-		box,
-	];
-};
-
-export let add = (node, inputs, updateOut) => {
-	// Make an R out of key
-	let r = R(getNodeLocation(node.id), node.id);
-	let update = inputs;
-
-	let props = getProps(node.id);
-	let val = reactive(props.value.reduce((acc, v) => acc += v, 0));
-
-	update.subscribe(() => {
-		props = getProps(node.id);
-		val.next(props.value.reduce((acc, v) => acc += v, 0));
-	});
-
-	let cursor = dom(["span", val]);
-
-	return [cursor];
-};
 
 // GAME PLAN

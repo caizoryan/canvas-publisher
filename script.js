@@ -1,6 +1,13 @@
-import { memo } from "./chowk.js";
+import { memo, reactive } from "./chowk.js";
 import { dom } from "./dom.js";
-import { addNode, removeEdge, state, store, try_set_channel } from "./state.js";
+import {
+	addNode,
+	registery,
+	removeEdge,
+	state,
+	store,
+	try_set_channel,
+} from "./state.js";
 import { Keymanager } from "./keymanager.js";
 import { sidebar } from "./sidebar.js";
 import { dragOperations } from "./dragOperations.js";
@@ -107,8 +114,11 @@ const toggleTrackingMode = () =>
 	state.trackpad_movement = !state.trackpad_movement;
 const toggleSidebar = () => state.sidebarOpen.next((e) => !e);
 const toggleHelpbar = () => state.helpOpen.next((e) => !e);
-const removeCurrentEdge = () =>
-	state.selected_connection ? removeEdge(state.selected_connection) : null;
+const removeCurrentEdge = () => {
+	state.selectedConnection.value().forEach((edge) => {
+		removeEdge(edge);
+	});
+};
 
 const undo = () => store.canUndo() ? store.doUndo() : null;
 const redo = () => store.canRedo() ? store.doRedo() : null;
@@ -129,6 +139,7 @@ const vistLast = () => {
 const escape = () => {
 	state.canceled.next(true);
 	state.selected.next([]);
+	state.selectedConnection.next([]);
 };
 
 const saveCanvasToArena = () => {
@@ -183,7 +194,29 @@ const helpbtn = button(
 	() => state.helpOpen.next((e) => !e),
 );
 
-const buttons = [".main-buttons", savebtn, openbtn, helpbtn];
+let listFilter = reactive("");
+let listActive = reactive(false);
+listActive.subscribe((e) => e ? setTimeout(() => searchList.focus(), 0) : null);
+let searchList = dom(["input", {
+	type: "text",
+	// onblur: () => setTimeout(() => listActive.next(false), 50),
+	value: "",
+	oninput: (e) => listFilter.next(e.target.value),
+}]);
+const listmenu = [".lister", { active: listActive }, searchList, [
+	".list-items",
+	memo(
+		() =>
+			registery.list.value()
+				.filter((e) =>
+					e.toLowerCase().includes(listFilter.value().toLowerCase())
+				)
+				.map((e) => button(e, () => state.making_node = e)),
+		[registery.list, listFilter],
+	),
+]];
+
+const buttons = [".main-buttons", savebtn, openbtn, helpbtn, listmenu];
 
 // --------------------
 // Move this somewhere
@@ -400,44 +433,23 @@ keys.on("ArrowUp", moveUp, { disable_in_input: true });
 keys.on("ArrowDown", moveDown, { disable_in_input: true });
 
 keys.on("cmd + e", toggleSidebar, prevent);
-keys.on("alt + cmd + c", toggleSidebar, prevent);
 keys.on("escape", escape, { modifiers: false, disable_in_input: true });
 keys.on("b", vistLast, { modifiers: false, disable_in_input: true });
 keys.on("t", toggleTrackingMode, { disable_in_input: true });
 
+// keys.on("s", () => state.making_node = "canvas", {
+// 	modifiers: false,
+// 	disable_in_input: true,
+// });
 //TEMPORARAY
-keys.on("x", () => state.making_node = "slider", {
-	modifiers: false,
-	disable_in_input: true,
-});
-
-keys.on("o", () => state.making_node = "Object", {
-	modifiers: false,
-	disable_in_input: true,
-});
-
-keys.on("a", () => state.making_node = "add", {
-	modifiers: false,
-	disable_in_input: true,
-});
-
-keys.on("c", () => state.making_node = "circle", {
-	modifiers: false,
-	disable_in_input: true,
-});
-
-keys.on("l", () => state.making_node = "colorSliders", {
-	modifiers: false,
-	disable_in_input: true,
-});
-
-keys.on("s", () => state.making_node = "canvas", {
-	modifiers: false,
-	disable_in_input: true,
-});
 
 keys.on("cmd + s", saveCanvasToArena, prevent);
+
 keys.on("shift + /", toggleHelpbar, { disable_in_input: true });
+keys.on("slash", () => listActive.next((e) => !e), {
+	disable_in_input: true,
+	preventDefault: true,
+});
 keys.on("cmd + v", pasteInBlock, {
 	disable_in_input: true,
 	preventDefault: true,

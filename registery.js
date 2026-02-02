@@ -51,12 +51,14 @@ let nodeContainer = (node, attr, children) => {
 			return;
 		}
 		addToSelection(node, e);
+
+		store.resumeTracking();
 		store.startBatch();
 
-		left.next(left.value());
-		top.next(top.value());
-		width.next(width.value());
-		height.next(height.value());
+		left.next(left.value(), true);
+		top.next(top.value(), true);
+		width.next(width.value(), true);
+		height.next(height.value(), true);
 
 		store.endBatch();
 		store.pauseTracking();
@@ -80,9 +82,26 @@ let nodeContainer = (node, attr, children) => {
 		});
 	}, 50);
 
+	let isSelected = memo(
+		() => state.selected.value().includes(node.id),
+		[state.selected],
+	);
+
+	let isMultiSelected = memo(
+		() =>
+			state.selected.value().length > 1 &&
+			state.selected.value().includes(node.id),
+		[state.selected],
+	);
+
 	let el = dom(
 		".draggable.node",
-		{ style, ...attr },
+		{
+			style,
+			selected: isSelected,
+			"multi-selected": isMultiSelected,
+			...attr,
+		},
 		...edges,
 		...connects,
 		...children,
@@ -92,21 +111,31 @@ let nodeContainer = (node, attr, children) => {
 };
 export let createRegistery = () => {
 	let components = {};
-
-	let register = (name, inputs, outputs, renderer, transformer) => {
-		if (components[name]) console.error("Cant Make duplicates");
-		components[name] = {
+	let register = (name, inputs, outputs, render, transform) => {
+		let id = name;
+		console.log(id);
+		if (typeof name == "object") {
+			console.log("GOT OBJECT!?");
+			inputs = name.inputs;
+			outputs = name.outputs;
+			render = name.render;
+			transform = name.transform;
+			id = name.id;
+		}
+		if (components[id]) console.error("Cant Make duplicates");
+		components[id] = {
 			inputs,
 			outputs,
-			renderer,
-			transformer,
+			render,
+			transform,
 		};
+		list.next(Object.keys(components));
 	};
 
 	// or maybe
 	// this should be called something like mount
 	let mount = (node) => {
-		let { renderer, inputs, outputs, transformer } = components[node.type];
+		let { render, inputs, outputs, transform } = components[node.type];
 
 		let _inputs = reactive({});
 		store.subscribe(BUFFERS.concat([node.id]), (e) => _inputs.next(e));
@@ -135,9 +164,11 @@ export let createRegistery = () => {
 
 		let inputParsed = memo(() => {
 			let props = store.get(getNodeLocation(node.id).concat(["data"]));
-			Object.entries(inputs).forEach(([key, value]) => {
-				if (value.collects) props[key] = [];
-			});
+			if (typeof inputs == "object") {
+				Object.entries(inputs).forEach(([key, value]) => {
+					if (value.collects) props[key] = [];
+				});
+			}
 
 			let inputToSort = _inputs.value();
 			// sort inputs first based on edges
@@ -160,6 +191,8 @@ export let createRegistery = () => {
 				Object.entries(p).forEach(([key, value]) => {
 					if (value == undefined) {
 						return;
+					} else if (typeof inputs == "string" && inputs == "ANY") {
+						props[key] = value;
 					} else if (inputs[key] != undefined) {
 						// TODO: Make these transactions...
 						if (inputs[key].collects) props[key].push(value);
@@ -175,7 +208,7 @@ export let createRegistery = () => {
 		let update = reactive(0);
 		let updateBuffers = () => update.next((e) => e + 1);
 
-		if (transformer) {
+		if (transform) {
 			let _outputs = {
 				isReactive: true,
 				value: () => store.get(EDGEMAP.concat([node.id])),
@@ -193,20 +226,22 @@ export let createRegistery = () => {
 			memo(() => {
 				if (!outputBuffers.value()) return;
 				outputBuffers.value().forEach((id) => {
-					let v = transformer(inputParsed.value());
+					let v = transform(inputParsed.value());
 					store.apply(["buffers", id], "set", [node.id, v], false);
 				});
 			}, [outputBuffers, inputParsed, update]);
 		}
 
-		if (!renderer) return;
+		if (!render) return;
 		else {
-			let rendered = renderer(node, inputParsed, updateBuffers);
+			let rendered = render(node, inputParsed, updateBuffers);
 			if (Array.isArray(rendered)) {
 				return nodeContainer(node, { activated }, rendered);
 			} else return rendered;
 		}
 	};
 
-	return { register, mount };
+	let list = reactive(Object.keys(components));
+
+	return { register, mount, list };
 };

@@ -1,0 +1,296 @@
+import { dataR, getProps, R } from "./index.js";
+import { getNodeLocation, store } from "../state.js";
+import { dom } from "../dom.js";
+import { memo, reactive } from "../chowk.js";
+import { drag } from "../drag.js";
+import { V } from "../schema.js";
+
+export let objectPlexer = (node, inputs, updateOut) => {
+	// Make an R out of key
+	let r = dataR(getNodeLocation(node.id), node.id);
+	let key = r("key");
+
+	let cursor = dom(["textarea", {
+		type: "text",
+		oninput: (e) => {
+			key.next(e.target.value.trim());
+			updateOut();
+		},
+	}, key]);
+
+	return [cursor];
+};
+
+export let colorSliders = (node, inputs, updateOut) => {
+	// Make an R out of key
+	let r = dataR(getNodeLocation(node.id), node.id);
+	let c = r("c");
+	let m = r("m");
+	let y = r("y");
+	let k = r("k");
+
+	let colorSlider = (v) => {
+		return ["input.color", {
+			type: "range",
+			min: 0,
+			max: 100,
+			step: 1,
+			value: memo(() => v.value(), [inputs]),
+			oninput: (e) => {
+				v.next(parseFloat(e.target.value));
+				updateOut();
+			},
+		}];
+	};
+
+	function cmykToRgb(c, m, y, k) {
+		const r = Math.round(255 * (1 - c) * (1 - k));
+		const g = Math.round(255 * (1 - m) * (1 - k));
+		const b = Math.round(255 * (1 - y) * (1 - k));
+
+		return { r, g, b };
+	}
+
+	let box = [".color-box", {
+		style: memo(() => {
+			let { r, g, b } = cmykToRgb(
+				c.value() / 100,
+				m.value() / 100,
+				y.value() / 100,
+				k.value() / 100,
+			);
+
+			return `background-color: rgb(${r}, ${g}, ${b});`;
+		}, [c, m, y, k]),
+	}];
+
+	return [
+		colorSlider(c),
+		colorSlider(m),
+		colorSlider(y),
+		colorSlider(k),
+		box,
+	];
+};
+
+export let add = (node, inputs, updateOut) => {
+	// Make an R out of key
+	let update = inputs;
+	let props = getProps(node.id);
+	let val = reactive(props.value.reduce((acc, v) => acc += v, 0));
+
+	update.subscribe(() => {
+		props = getProps(node.id);
+		val.next(
+			props.value.reduce((acc, v) => acc += v, 0)
+				.toFixed(2),
+		);
+	});
+
+	let cursor = dom(["code", "+ ", ["span", val]]);
+
+	return [cursor];
+};
+
+export let sub = (node, inputs, updateOut) => {
+	// Make an R out of key
+	let update = inputs;
+	let props = getProps(node.id);
+	let val = reactive(
+		props.value.reduce((acc, v, i) => i == 0 ? acc = v : acc -= v, 0),
+	);
+
+	update.subscribe(() => {
+		props = getProps(node.id);
+		val.next(
+			props.value.reduce((acc, v, i) => i == 0 ? acc = v : acc -= v, 0)
+				.toFixed(2),
+		);
+	});
+
+	let cursor = dom(["code", "+ ", ["span", val]]);
+
+	return [cursor];
+};
+
+let sliderAxis = (axis = "horizontal") => (node, ins, updateOut) => {
+	let props = getProps(node.id);
+	let value = props.value ? props.value : 1;
+
+	ins.subscribe((v) => {
+		props = getProps(node.id);
+		if (props.value == undefined) return;
+		x.next(props.value);
+	});
+
+	let x = reactive(value);
+	x.subscribe((v) => {
+		store.apply(getNodeLocation(node.id).concat(["data"]), "set", [
+			"value",
+			v,
+		], false);
+		updateOut();
+	});
+
+	let stylememo = memo(() => `
+		left: ${axis == "horizontal" ? x.value() : -8}px;
+		top:  ${axis == "vertical" ? x.value() : -8}px;
+	`, [x]);
+	let cursor = dom([
+		".psuedo-cursor.flex-center",
+		{ style: stylememo },
+	]);
+
+	setTimeout(() => {
+		let set_left = (v) => axis == "horizontal" ? x.next(v) : null;
+		let set_top = (v) => axis == "vertical" ? x.next(v) : null;
+
+		drag(cursor, { set_left, set_top });
+	}, 100);
+
+	return [cursor];
+};
+
+let declareVariable = (node, inputs) => {
+	// will take a value as input
+	// Make an R out of key
+	let r = dataR(getNodeLocation(node.id), node.id);
+	let key = r("name");
+
+	let update = () => {
+		let variables = store.get(["variables"]);
+		// if there is already a var from this node and its key is not cur, remove it
+		let found = Object.entries(variables)
+			.find(([k, value]) => value?.source == node.id && k != key.value());
+
+		if (found) {
+			store.tr(["variables"], "set", [found[0], undefined]);
+		}
+
+		let value = store.get(getNodeLocation(node.id).concat(["data"]));
+		store.tr(["variables"], "set", [key.value(), {
+			value,
+			source: node.id,
+		}]);
+	};
+
+	inputs.subscribe(update);
+
+	let cursor = dom(["textarea", {
+		type: "text",
+		oninput: (e) => {
+			key.next(e.target.value.trim());
+			update();
+		},
+	}, key]);
+
+	return [cursor];
+	// will have a name
+	// will save name to node map vibes...
+};
+
+let recieverVariable = (node, inputs, updateOut) => {
+	let r = dataR(getNodeLocation(node.id), node.id);
+	let key = r("name");
+	let value = r("value");
+
+	let sub = store.subscribe(["variables", key.value()], (e) => {
+		if (e) value.next(e);
+	});
+
+	value.subscribe((v) => {
+		updateOut();
+	});
+
+	let update = () => {
+		sub();
+		sub = store.subscribe(["variables", key.value()], (e) => {
+			if (e) value.next(e);
+		});
+		let _value = store.get(["variables", key.value()]);
+		if (_value) value.next(_value);
+	};
+
+	let cursor = dom(["textarea", {
+		type: "text",
+		oninput: (e) => {
+			key.next(e.target.value.trim());
+			update();
+		},
+	}, key]);
+
+	return [cursor];
+	// let R = dataR()
+	// will basically subscribe to variable manually
+	// update all the outputs
+};
+
+export let CreateVariable = {
+	id: "create-variable",
+	render: declareVariable,
+	inputs: "ANY",
+	outputs: {},
+	transform: (props) => ({}),
+};
+
+export let ReadVariable = {
+	id: "read-variable",
+	render: recieverVariable,
+	inputs: { value: V.any({}) },
+	outputs: {},
+	transform: (props) => {
+		console.log("Recieving", props);
+		if (!props?.value?.value) return {};
+		else if (typeof props.value.value == "object") {
+			return { ...props.value.value };
+		} else return {};
+	},
+};
+
+export let MathComps = {
+	add: {
+		id: "add",
+		render: add,
+		inputs: { value: V.number(0).collect() },
+		outputs: {},
+		transform: (props) => ({
+			value: props.value.reduce((acc, v) => acc += v, 0),
+		}),
+	},
+
+	sub: {
+		id: "sub",
+		render: sub,
+		inputs: { value: V.number(0).collect() },
+		outputs: {},
+		transform: (props) => ({
+			value: props.value.reduce(
+				(acc, v, i) => i == 0 ? acc = v : acc -= v,
+				0,
+			),
+		}),
+	},
+};
+
+export let Slider = {
+	id: "slider",
+	inputs: { value: V.number(10) },
+	outpus: {},
+	render: sliderAxis(),
+	transform: (props) => props,
+};
+
+export const ObjectLabeller = {
+	id: "Object",
+	render: objectPlexer,
+	inputs: {
+		key: V.string("x"),
+		value: V.number(0),
+	},
+	outputs: {},
+	transform: (props) => {
+		const o = {};
+		o[props.key] = props.value;
+		return o;
+	},
+};

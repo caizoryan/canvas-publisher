@@ -1,4 +1,4 @@
-const any = () => {
+const any = (v) => {
 	const root = {
 		collects: false,
 		collect: () => {
@@ -6,7 +6,7 @@ const any = () => {
 			root.default = root.default == undefined ? [] : [root.default];
 			return root;
 		},
-		default: undefined,
+		default: v,
 		check: () => true,
 	};
 
@@ -40,4 +40,5 @@ export const V = {
 	number,
 	string,
 	array,
+	any,
 };

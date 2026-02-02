@@ -9,7 +9,7 @@ import {
 	Transform,
 	uuid,
 } from "./block.js";
-import { addNode, state, store } from "./state.js";
+import { addNode, boundingToSide, state, store } from "./state.js";
 import { add_block } from "./arena.js";
 
 let anchor = undefined;
@@ -19,9 +19,62 @@ let startY = reactive(0);
 let endX = reactive(0);
 let endY = reactive(0);
 
+function lineIntersectsRect(x1, y1, x2, y2, rx1, ry1, rx2, ry2) {
+	// rectangle edges
+	const edges = [
+		// top
+		[rx1, ry1, rx2, ry1],
+		// right
+		[rx2, ry1, rx2, ry2],
+		// bottom
+		[rx2, ry2, rx1, ry2],
+		// left
+		[rx1, ry2, rx1, ry1],
+	];
+
+	for (const [x3, y3, x4, y4] of edges) {
+		const hit = intersect(x1, y1, x2, y2, x3, y3, x4, y4);
+		if (hit) {
+			return hit;
+		}
+	}
+
+	return false;
+}
+// line intercept math by Paul Bourke http://paulbourke.net/geometry/pointlineplane/
+// Determine the intersection point of two line segments
+// Return FALSE if the lines don't intersect
+function intersect(x1, y1, x2, y2, x3, y3, x4, y4) {
+	// Check if none of the lines are of length 0
+	if ((x1 === x2 && y1 === y2) || (x3 === x4 && y3 === y4)) {
+		return false;
+	}
+
+	let denominator = (y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1);
+
+	// Lines are parallel
+	if (denominator === 0) {
+		return false;
+	}
+
+	let ua = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) / denominator;
+	let ub = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) / denominator;
+
+	// is the intersection along the segments
+	if (ua < 0 || ua > 1 || ub < 0 || ub > 1) {
+		return false;
+	}
+
+	// Return a object with the x and y coordinates of the intersection
+	let x = x1 + ua * (x2 - x1);
+	let y = y1 + ua * (y2 - y1);
+
+	return { x, y };
+}
+
 export let dragTransforms = { startX, startY, endX, endY };
 
-/** @type {( "pan" | "making-block" | 'making-group' | 'select' | 'zoom')}*/
+/** @type {( "pan" | "making-block" | 'making-group' | 'select' | 'zoom' | 'connect' )}*/
 let dragAction = "pan";
 
 export let dragOperations = {
@@ -135,7 +188,9 @@ export let dragOperations = {
 
 		else if (dragAction == "select") {
 			let nodes = store.get(["data", "nodes"]);
+			let edges = store.get(["data", "edges"]);
 			let selection = [];
+			let connectionSelection = [];
 			nodes.forEach((node) => {
 				let fn = isRectIntersecting;
 				if (node.type == "group") fn = isRectContained;
@@ -144,7 +199,32 @@ export let dragOperations = {
 					: null;
 			});
 
+			edges.forEach((edge) => {
+				// get x lines
+				let from = store.get(["data", "nodes"]).find((f) =>
+					f.id == edge.fromNode
+				);
+				let to = store.get(["data", "nodes"]).find((f) => f.id == edge.toNode);
+
+				let fromB = boundingToSide(from, edge.fromSide);
+				let toB = boundingToSide(to, edge.toSide);
+
+				let x1 = fromB.x;
+				let y1 = fromB.y;
+				let x2 = toB.x;
+				let y2 = toB.y;
+
+				if (lineIntersectsRect(x1, y1, x2, y2, x, y, x + width, y + height)) {
+					console.log("OK?", x1, y1, x2, y2, x, y, width, height);
+					connectionSelection.push(edge.id);
+				}
+			});
+
 			state.selected.next(selection);
+
+			if (connectionSelection.length != 0) {
+				state.selectedConnection.next(connectionSelection);
+			}
 		}
 	},
 };

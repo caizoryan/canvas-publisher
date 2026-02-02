@@ -94,8 +94,34 @@ line {
 	pointer-events: auto;
 }
 
-line.connection-line:hover {
-	stroke: #f00;
+line[selected='true'] {
+	stroke: #f20;
+}
+
+line:hover {
+	stroke: #faa;
+}
+
+
+.lister {
+	position: relative;
+	display: none;
+}
+
+.lister[active='true'] {
+	display: block;
+}
+
+.list-items {
+	position: absolute;
+	background-color: white;
+	height: 100px;
+	width: 100%;
+	overflow-y: scroll;
+}
+
+.list-items>* {
+	margin: .1em;
 }
 
 .bar {
@@ -293,10 +319,10 @@ button {
 }
 
 
-.connection svg,
-.connection svg line {
-	pointer-events: none;
-}
+/* .connection svg, */
+/* .connection svg line { */
+/* 	pointer-events: none; */
+/* } */
 
 .big-box {}
 

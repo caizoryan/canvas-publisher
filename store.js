@@ -40,20 +40,15 @@ export let createStore = (internal) => {
 
 	let recordInverse = (action) => {
 		if (tracking == "undo") {
-			console.log("Undo Recorded: ", action);
 			if (!doingRedo) {
 				while (redo.length != 0) {
 					redo.pop();
 				}
 			}
 			undo.push(action);
-			onHistoryUpdate.forEach((fn) => fn());
 		} else if (tracking == "redo") {
-			console.log("Redo Recorded: ", action);
 			redo.push(action);
-			onHistoryUpdate.forEach((fn) => fn());
 		} else if (tracking == "batch") {
-			console.log("Batch Recorded: ", action);
 			batch.push(action);
 		}
 	};
