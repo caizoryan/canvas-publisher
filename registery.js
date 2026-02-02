@@ -2,7 +2,7 @@
 // when rendering, it will send each node to registery
 // registery will match the type to its components
 // and send back an element.
-import { addToSelection, R } from "./canvas.js";
+import { R } from "./canvas.js";
 import { memo, reactive } from "./chowk.js";
 import { dom } from "./dom.js";
 import { Color, connectors, CSSTransform, resizers, uuid } from "./block.js";
@@ -18,6 +18,11 @@ import {
 	store,
 	subscribeToId,
 } from "./state.js";
+
+export let addToSelection = (block, e) => {
+	if (e.shiftKey) state.selected.next((e) => [...e, block.id]);
+	else state.selected.next([block.id]);
+};
 
 let nodeContainer = (node, attr, children) => {
 	let r = R(getNodeLocation(node.id), node.id);
@@ -154,10 +159,12 @@ export let createRegistery = () => {
 			let props = store.get(getNodeLocation(node.id).concat(["data"]));
 			if (!props) props = {};
 
-			Object.entries(inputs).forEach(([key, value]) => {
-				// check if already data
-				if (props[key] == undefined) props[key] = value.default;
-			});
+			if (typeof inputs == "object") {
+				Object.entries(inputs).forEach(([key, value]) => {
+					// check if already data
+					if (props[key] == undefined) props[key] = value.default;
+				});
+			}
 
 			store.apply(getNodeLocation(node.id), "set", ["data", props], false);
 		}
@@ -170,7 +177,6 @@ export let createRegistery = () => {
 				});
 			}
 
-			let inputToSort = _inputs.value();
 			// sort inputs first based on edges
 			// not sure how this will work...
 			let sorted = {};
@@ -201,12 +207,22 @@ export let createRegistery = () => {
 				});
 			});
 
-			// console.log("FINAL", props);
 			return props;
 		}, [_inputs]);
 
+		// --------------
+		// --------------
+		// OUTPUTING LOGIC
+		// --------------
+		// --------------
 		let update = reactive(0);
-		let updateBuffers = () => update.next((e) => e + 1);
+		let updateTimeout;
+		let updateBuffers = () => {
+			// if (updateTimeout) clearTimeout(updateTimeout);
+			// updateTimeout = setTimeout(() => {
+			update.next((e) => e + 1);
+			// }, 150);
+		};
 
 		if (transform) {
 			let _outputs = {
@@ -242,6 +258,7 @@ export let createRegistery = () => {
 	};
 
 	let list = reactive(Object.keys(components));
+	let getTransformFn = (id) => components[id]?.transform;
 
-	return { register, mount, list };
+	return { register, mount, list, getTransformFn };
 };

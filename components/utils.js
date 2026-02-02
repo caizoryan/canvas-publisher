@@ -1,5 +1,11 @@
 import { dataR, getProps, R } from "./index.js";
-import { getNodeLocation, store } from "../state.js";
+import {
+	EDGEMAP,
+	getNodeLocation,
+	NODEAT,
+	registery,
+	store,
+} from "../state.js";
 import { dom } from "../dom.js";
 import { memo, reactive } from "../chowk.js";
 import { drag } from "../drag.js";
@@ -185,6 +191,32 @@ let sliderAxis = (axis = "horizontal") => (node, ins, updateOut) => {
 	return [cursor];
 };
 
+let slider2D = (node, ins, updateOut) => {
+	let props = getProps(node.id);
+	let r = dataR(getNodeLocation(node.id), node.id);
+	let x = r("x");
+	let y = r("y");
+	x.subscribe(() => updateOut());
+
+	let stylememo = memo(() => `
+		left: ${x.value()}px;
+		top:  ${y.value()}px;
+	`, [x]);
+	let cursor = dom([
+		".psuedo-cursor.flex-center",
+		{ style: stylememo },
+	]);
+
+	setTimeout(() => {
+		let set_left = (v) => x.next(v);
+		let set_top = (v) => y.next(v);
+
+		drag(cursor, { set_left, set_top });
+	}, 100);
+
+	return [cursor];
+};
+
 let declareVariable = (node, inputs) => {
 	// will take a value as input
 	// Make an R out of key
@@ -209,6 +241,144 @@ let declareVariable = (node, inputs) => {
 	};
 
 	inputs.subscribe(update);
+
+	let cursor = dom(["textarea", {
+		type: "text",
+		oninput: (e) => {
+			key.next(e.target.value.trim());
+			update();
+		},
+	}, key]);
+
+	return [cursor];
+	// will have a name
+	// will save name to node map vibes...
+};
+
+let Function = (node, inputs) => {
+	// will take a value as input
+	// Make an R out of key
+	let r = dataR(getNodeLocation(node.id), node.id);
+	let key = r("name");
+
+	let update = () => {
+		let variables = store.get(["variables"]);
+		// if there is already a var from this node and its key is not cur, remove it
+		let found = Object.entries(variables)
+			.find(([k, value]) => value?.source == node.id && k != key.value());
+
+		if (found) {
+			store.tr(["variables"], "set", [found[0], undefined]);
+		}
+
+		let value = store.get(getNodeLocation(node.id).concat(["data"]));
+		store.tr(["variables"], "set", [key.value(), {
+			value,
+			source: node.id,
+		}]);
+	};
+
+	inputs.subscribe(update);
+
+	let _outputs = {
+		isReactive: true,
+		value: () => store.get(EDGEMAP.concat([node.id])),
+		subscribe: (fn) => store.subscribe(EDGEMAP.concat([node.id]), fn),
+	};
+
+	let follow = (nodeId) => {
+		let edges = store.get(EDGEMAP.concat([nodeId]));
+		if (!edges) return { block: nodeId, out: [] };
+		// .map((e) => e.blockId);
+		let data = store.get(getNodeLocation(nodeId).concat(["data"]));
+		let type = store.get(getNodeLocation(nodeId).concat(["type"]));
+		let transform = registery.getTransformFn(type);
+
+		let outputsTo = edges
+			.map((e) => e.blockId)
+			.map((e) => follow(e));
+
+		return { block: nodeId, out: outputsTo, data, type, transform };
+	};
+
+	let outputBuffers = memo(
+		() =>
+			_outputs
+				.value()
+				.map((e) => e.blockId)
+				.map(follow),
+		[_outputs],
+	);
+
+	let applyData = (node, data, newData, inputs) => {
+		let props = data;
+		if (typeof inputs == "object") {
+			Object.entries(inputs).forEach(([key, value]) => {
+				if (value.collects) props[key] = [];
+			});
+		}
+
+		// sort inputs first based on edges
+		// not sure how this will work...
+		let sorted = {};
+		let edgesCopy = store.get(["data", "edges"]);
+		Object.entries(newData).forEach(([key, value]) => {
+			let edge = store.get(["edgeMap", key]).find((e) => e.blockId == node.id);
+			let edgeId;
+			if (edge) edgeId = edge.edgeId;
+			let position = edgesCopy.findIndex((e) => e.id == edgeId);
+			sorted[position + ""] = value;
+		});
+
+		Object.values(sorted).forEach((p) => {
+			if (!p) return;
+
+			Object.entries(p).forEach(([key, value]) => {
+				if (value == undefined) {
+					return;
+				} else if (typeof inputs == "string" && inputs == "ANY") {
+					props[key] = value;
+				} else if (inputs[key] != undefined) {
+					// TODO: Make these transactions...
+					if (inputs[key].collects) props[key].push(value);
+					else props[key] = value;
+				}
+			});
+		});
+
+		return props;
+	};
+
+	outputBuffers.subscribe((f) => {
+		console.log("Outputs to, ", f);
+		let printFn = (e) => {
+			console.log("Daddy: ", e.type, e.transform);
+			if (e.out?.length > 0) console.log("Children: ");
+			e.out.forEach((f) => {
+				printFn(f);
+			});
+		};
+
+		f.forEach((e) => {
+			printFn(e);
+		});
+		// Essentially I have to make a virtual node system
+		// perform the applications
+		// and at the end return the data from first return node
+		// return node will be same as object node, just with a return tag
+		// following -> save data and fn and have a next,
+		// result of one transform goes to the data of next application
+		//
+		// follow till you get to a return block
+	});
+
+	// memo(() => {
+	// 	if (!outputBuffers.value()) return;
+	// 	outputBuffers.value().forEach((id) => {
+	// 		let v = transform(inputParsed.value());
+	// 		store.apply(["buffers", id], "set", [node.id, v], false);
+	// 	});
+	// }, [outputBuffers]);
 
 	let cursor = dom(["textarea", {
 		type: "text",
@@ -265,6 +435,17 @@ export let CreateVariable = {
 	inputs: "ANY",
 	outputs: {},
 	transform: (props) => ({}),
+};
+
+export let CreateFunction = {
+	id: "create-function",
+	render: Function,
+	inputs: {},
+	outputs: {},
+	transform: (props) => {
+		console.log(props);
+		return {};
+	},
 };
 
 export let ReadVariable = {
@@ -336,6 +517,17 @@ export let Slider = {
 	inputs: { value: V.number(10) },
 	outpus: {},
 	render: sliderAxis(),
+	transform: (props) => props,
+};
+
+export let Slider2D = {
+	id: "slider2D",
+	inputs: {
+		x: V.number(10),
+		y: V.number(10),
+	},
+	outputs: {},
+	render: slider2D,
 	transform: (props) => props,
 };
 

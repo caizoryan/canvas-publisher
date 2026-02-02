@@ -13,11 +13,13 @@ import {
 	add,
 	colorSliders,
 	CompileObject,
+	CreateFunction,
 	CreateVariable,
 	MathComps,
 	ObjectLabeller,
 	ReadVariable,
 	Slider,
+	Slider2D,
 } from "./components/utils.js";
 import { renderCanvas } from "./canvas.js";
 import { V } from "./schema.js";
@@ -181,6 +183,8 @@ registery.register(MathComps.add);
 registery.register(MathComps.sub);
 registery.register(MathComps.mul);
 registery.register(Slider);
+registery.register(Slider2D);
+registery.register(CreateFunction);
 registery.register(CreateVariable);
 registery.register(ReadVariable);
 registery.register(CompileObject);

@@ -3,14 +3,7 @@
 import { button, Color, connectors, CSSTransform, resizers } from "./block.js";
 import { memo, reactive } from "./chowk.js";
 import { dom } from "./dom.js";
-import { drag } from "./drag.js";
-import {
-	BUFFERS,
-	getNodeLocation,
-	state,
-	store,
-	subscribeToId,
-} from "./state.js";
+import { getNodeLocation, state, store, subscribeToId } from "./state.js";
 
 import { blobStream } from "./blob-stream.js";
 import { PDFDocument } from "./pdfkit.standalone.js";
@@ -33,11 +26,6 @@ try {
 	window.pdfjsWorker = PDFWorker;
 	console.log("CAUGHT");
 }
-
-export let addToSelection = (block, e) => {
-	if (e.shiftKey) state.selected.next((e) => [...e, block.id]);
-	else state.selected.next([block.id]);
-};
 
 // ~~~~~~~~~~~~~~~~~~~
 export let R = (location, id) => (key) => ({
@@ -183,10 +171,3 @@ let drawCircleDocFn = (props) => (doc) => {
 
 	doc.restore();
 };
-
-let getProps = (id) => store.get(getNodeLocation(id).concat(["data"]));
-
-const mapRange = (value, inMin, inMax, outMin, outMax) =>
-	(value - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
-
-// GAME PLAN
