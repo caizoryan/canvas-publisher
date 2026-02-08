@@ -111,6 +111,7 @@ let nodeContainer = (node, attr, children) => {
 	let el = dom(
 		".draggable.node",
 		{
+			id: node.id,
 			style,
 			selected: isSelected,
 			"multi-selected": isMultiSelected,

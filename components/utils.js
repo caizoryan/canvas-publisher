@@ -410,7 +410,6 @@ let Function = (node, inputs) => {
 	let follow = (nodeId) => {
 		let edges = store.get(EDGEMAP.concat([nodeId]));
 		let allEdges = store.get(EDGEMAP);
-		console.log("all edges", allEdges);
 		if (!edges) return { id: nodeId, out: [] };
 		// .map((e) => e.blockId);
 		let data = store.get(getNodeLocation(nodeId).concat(["data"]));
@@ -427,7 +426,6 @@ let Function = (node, inputs) => {
 
 	let outputBuffers = reactive([]);
 	_outputs.subscribe((v) => {
-		console.log(v);
 		setTimeout(() => {
 			outputBuffers.next(
 				v
@@ -454,9 +452,12 @@ let Function = (node, inputs) => {
 		// sort inputs first based on edges
 		// not sure how this will work...
 		let sorted = {};
-		let edgesCopy = [...store.get(["data", "edges"])];
+		let edgesCopy = store.get(["data", "edges"]);
 		Object.entries(newData).forEach(([key, value]) => {
-			let edge = store.get(["edgeMap", key]).find((e) => e.blockId == node.id);
+			let edge = store.get(EDGEMAP.concat([key])).find((e) =>
+				e.blockId == node.id
+			);
+
 			let edgeId;
 			if (edge) edgeId = edge.edgeId;
 			let position = edgesCopy.findIndex((e) => e.id == edgeId);
@@ -486,28 +487,13 @@ let Function = (node, inputs) => {
 		let executeAndReturn = (props) => {
 			let returnNode;
 			let virtualNodes = {};
+			let virtualBuffers = {};
 			let execute = (e, input = {}) => {
 				let node = virtualNodes[e.id];
+				let buffer = virtualBuffers[e.id];
+				Object.assign(buffer, input);
 
-				if (e.type == "canvas") {
-					console.log("CANVAS GETTING:", input);
-				}
-				applyData(node, node.data, input, node.inputs);
-
-				if (e.type == "return") {
-					if (returnNode == e.id) {
-						console.log("RETURN: ", node, { ...node.data });
-					}
-					return;
-				}
-
-				if (e.type == "canvas") {
-					console.log("EXECUTED CANVAS", node.data, { ...node.data.draw });
-				}
-
-				if (e.type == "line") {
-					console.log("EXECUTED LINE", node.data, { ...node.data });
-				}
+				applyData(node, node.data, buffer, node.inputs);
 
 				e.out.forEach((f) => {
 					execute(f, { [e.id]: node.transform(node.data) });
@@ -520,10 +506,13 @@ let Function = (node, inputs) => {
 						returnNode = e.id;
 					}
 					virtualNodes[e.id] = {
+						id: e.id,
 						data: { ...e.data },
 						transform: e.transform,
 						inputs: e.inputs,
 					};
+
+					virtualBuffers[e.id] = {};
 				}
 
 				e.out.forEach((f) => {
@@ -556,7 +545,6 @@ let Function = (node, inputs) => {
 
 	return [
 		button("compile", () => {
-			console.log("Compiled", outputBuffers.value());
 			let fn = compileFunction(outputBuffers.value());
 			update();
 		}),
@@ -612,8 +600,6 @@ let applyFunction = (node, inputs, updateOut) => {
 	});
 
 	_function.subscribe((v) => {
-		// console.log("FUCNTION", v);
-		// console.log("FUCNTION ASS", v.function({}));
 		updateOut();
 	});
 
@@ -681,15 +667,9 @@ export let ApplyFunction = {
 	transform: (props) => {
 		if (!props?.function) return {};
 		else if (typeof props.function == "function") {
-			console.log("Outting", props.function(props));
 			let out = { ...props.function(props) };
 			return out;
 		} else if (typeof props.function?.function == "function") {
-			console.log(
-				"Outting",
-				props.function.function,
-				props.function.function(props),
-			);
 			let out = { ...props.function.function(props) };
 			return out;
 		} else return {};
