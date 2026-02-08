@@ -10,6 +10,7 @@ import { dom } from "../dom.js";
 import { memo, reactive } from "../chowk.js";
 import { drag } from "../drag.js";
 import { V } from "../schema.js";
+import { button } from "../block.js";
 
 export let objectPlexer = (node, inputs, updateOut) => {
 	// Make an R out of key
@@ -208,8 +209,8 @@ let slider2D = (node, ins, updateOut) => {
 	]);
 
 	setTimeout(() => {
-		let set_left = (v) => x.next(v);
-		let set_top = (v) => y.next(v);
+		let set_left = (v) => x.next(round(v, 20));
+		let set_top = (v) => y.next(round(v, 20));
 
 		drag(cursor, { set_left, set_top });
 	}, 100);
@@ -217,6 +218,120 @@ let slider2D = (node, ins, updateOut) => {
 	return [cursor];
 };
 
+let line = (node, ins, updateOut) => {
+	let props = getProps(node.id);
+	let r = dataR(getNodeLocation(node.id), node.id);
+	let start = r("start");
+	let end = r("end");
+	start.subscribe(() => updateOut());
+	end.subscribe(() => updateOut());
+
+	let startStyle = memo(() => `
+		left: ${start.value().x}px;
+		top:  ${start.value().y}px;
+	`, [start]);
+
+	let startCursor = dom([
+		".psuedo-cursor.flex-center",
+		{ style: startStyle },
+	]);
+
+	let endStyle = memo(() => `
+		left: ${end.value().x}px;
+		top:  ${end.value().y}px;
+	`, [end]);
+
+	let endCursor = dom([
+		".psuedo-cursor.flex-center",
+		{ style: endStyle },
+	]);
+
+	setTimeout(() => {
+		let set_start_position = (x, y) => {
+			start.next({ x, y });
+		};
+
+		let set_end_position = (x, y) => {
+			end.next({ x, y });
+		};
+
+		drag(startCursor, { set_position: set_start_position });
+		drag(endCursor, { set_position: set_end_position });
+	}, 100);
+
+	return [startCursor, endCursor];
+};
+
+let grid2D = (node, ins, updateOut) => {
+	let props = getProps(node.id);
+	let r = dataR(getNodeLocation(node.id), node.id);
+	let _r = R(getNodeLocation(node.id), node.id);
+	let width = _r("width");
+	let height = _r("height");
+	let columns = r("columns");
+	let rows = r("rows");
+	let coord = r("coord");
+	let x = r("x");
+	let y = r("y");
+
+	coord.subscribe((c) => {
+		let xDiff = width.value() / columns.value();
+		let yDiff = height.value() / rows.value();
+		x.next(c[0] * xDiff);
+		y.next(c[1] * yDiff);
+		updateOut();
+	});
+
+	// for c = 10, r = 10, coord = [5,5] will be center
+	// x.subscribe(() => updateOut());
+
+	// let stylememo = memo(() => `
+	// 	left: ${x.value()}px;
+	// 	top:  ${y.value()}px;
+	// `, [x]);
+	//
+	// let cursor = dom([
+	// 	".psuedo-cursor.flex-center",
+	// 	{ style: stylememo },
+	// ]);
+
+	let marker = (position, x, y) => [".marker", {
+		onclick: () => coord.next(position),
+		active: memo(
+			() => coord.value()[0] == position[0] && coord.value()[1] == position[1],
+			[coord],
+		),
+		style: `left: ${x}px; top: ${y}px`,
+	}, "x"];
+
+	let grid = memo(() => {
+		let xDiff = width.value() / columns.value();
+		let yDiff = height.value() / rows.value();
+		let markers = [];
+		for (let y = 0; y < rows.value(); y++) {
+			for (let x = 0; x < columns.value(); x++) {
+				markers.push(marker([x, y], xDiff * x, yDiff * y));
+			}
+		}
+
+		return [".markers", ...markers];
+		// will take rows and cols and divide
+		// width and height with it
+		// then will constuct spots to put things
+		// everytime col, row is changed redo
+	}, [rows, columns, width, height]);
+
+	setTimeout(() => {
+		// let set_left = (v) => x.next(round(v, 20));
+		// let set_top = (v) => y.next(round(v, 20));
+		//
+		// drag(cursor, { set_left, set_top });
+	}, 100);
+
+	return [grid];
+};
+
+export const round = (n, r) => Math.ceil(n / r) * r;
 let declareVariable = (node, inputs) => {
 	// will take a value as input
 	// Make an R out of key
@@ -262,7 +377,14 @@ let Function = (node, inputs) => {
 	let key = r("name");
 
 	let update = () => {
+		outputBuffers.next(
+			store.get(EDGEMAP.concat([node.id]))
+				.map((e) => e.blockId)
+				.map(follow),
+		);
+
 		let variables = store.get(["variables"]);
+
 		// if there is already a var from this node and its key is not cur, remove it
 		let found = Object.entries(variables)
 			.find(([k, value]) => value?.source == node.id && k != key.value());
@@ -271,14 +393,13 @@ let Function = (node, inputs) => {
 			store.tr(["variables"], "set", [found[0], undefined]);
 		}
 
-		let value = store.get(getNodeLocation(node.id).concat(["data"]));
 		store.tr(["variables"], "set", [key.value(), {
-			value,
+			function: compileFunction(outputBuffers.value()),
 			source: node.id,
 		}]);
 	};
 
-	inputs.subscribe(update);
+	inputs.subscribe(() => setTimeout(() => update(), 45));
 
 	let _outputs = {
 		isReactive: true,
@@ -288,32 +409,44 @@ let Function = (node, inputs) => {
 
 	let follow = (nodeId) => {
 		let edges = store.get(EDGEMAP.concat([nodeId]));
-		if (!edges) return { block: nodeId, out: [] };
+		let allEdges = store.get(EDGEMAP);
+		console.log("all edges", allEdges);
+		if (!edges) return { id: nodeId, out: [] };
 		// .map((e) => e.blockId);
 		let data = store.get(getNodeLocation(nodeId).concat(["data"]));
 		let type = store.get(getNodeLocation(nodeId).concat(["type"]));
 		let transform = registery.getTransformFn(type);
+		let inputs = registery.getInputs(type);
 
 		let outputsTo = edges
 			.map((e) => e.blockId)
 			.map((e) => follow(e));
 
-		return { block: nodeId, out: outputsTo, data, type, transform };
+		return { id: nodeId, out: outputsTo, data, type, transform, inputs };
 	};
 
-	let outputBuffers = memo(
-		() =>
-			_outputs
-				.value()
-				.map((e) => e.blockId)
-				.map(follow),
-		[_outputs],
-	);
+	let outputBuffers = reactive([]);
+	_outputs.subscribe((v) => {
+		console.log(v);
+		setTimeout(() => {
+			outputBuffers.next(
+				v
+					.map((e) => e.blockId)
+					.map(follow),
+			);
+		}, 25);
+	});
 
 	let applyData = (node, data, newData, inputs) => {
 		let props = data;
 		if (typeof inputs == "object") {
 			Object.entries(inputs).forEach(([key, value]) => {
+				// TODO: This is where the issue was
+				// it expected to get all inputs together not sequentially...
+				// Essentially have to track all inputs, so have to create
+				// a virtual buffer system also.
+				// BUt this is good, cuz I can write this out and then replace the main one
+				// with this nicer simpler impl
 				if (value.collects) props[key] = [];
 			});
 		}
@@ -321,7 +454,7 @@ let Function = (node, inputs) => {
 		// sort inputs first based on edges
 		// not sure how this will work...
 		let sorted = {};
-		let edgesCopy = store.get(["data", "edges"]);
+		let edgesCopy = [...store.get(["data", "edges"])];
 		Object.entries(newData).forEach(([key, value]) => {
 			let edge = store.get(["edgeMap", key]).find((e) => e.blockId == node.id);
 			let edgeId;
@@ -349,36 +482,69 @@ let Function = (node, inputs) => {
 		return props;
 	};
 
-	outputBuffers.subscribe((f) => {
-		console.log("Outputs to, ", f);
-		let printFn = (e) => {
-			console.log("Daddy: ", e.type, e.transform);
-			if (e.out?.length > 0) console.log("Children: ");
-			e.out.forEach((f) => {
-				printFn(f);
+	let compileFunction = (buffers) => {
+		let executeAndReturn = (props) => {
+			let returnNode;
+			let virtualNodes = {};
+			let execute = (e, input = {}) => {
+				let node = virtualNodes[e.id];
+
+				if (e.type == "canvas") {
+					console.log("CANVAS GETTING:", input);
+				}
+				applyData(node, node.data, input, node.inputs);
+
+				if (e.type == "return") {
+					if (returnNode == e.id) {
+						console.log("RETURN: ", node, { ...node.data });
+					}
+					return;
+				}
+
+				if (e.type == "canvas") {
+					console.log("EXECUTED CANVAS", node.data, { ...node.data.draw });
+				}
+
+				if (e.type == "line") {
+					console.log("EXECUTED LINE", node.data, { ...node.data });
+				}
+
+				e.out.forEach((f) => {
+					execute(f, { [e.id]: node.transform(node.data) });
+				});
+			};
+
+			let registerVirtual = (e) => {
+				if (!virtualNodes[e.id]) {
+					if (e.type == "return" && !returnNode) {
+						returnNode = e.id;
+					}
+					virtualNodes[e.id] = {
+						data: { ...e.data },
+						transform: e.transform,
+						inputs: e.inputs,
+					};
+				}
+
+				e.out.forEach((f) => {
+					registerVirtual(f);
+				});
+			};
+
+			buffers.forEach((e) => {
+				registerVirtual(e);
 			});
+
+			buffers.forEach((e) => {
+				execute(e, { [node.id]: props });
+			});
+
+			// if (returnNode) console.log("Return is there", virtualNodes[returnNode]);
+			if (returnNode) return virtualNodes[returnNode].data;
 		};
 
-		f.forEach((e) => {
-			printFn(e);
-		});
-		// Essentially I have to make a virtual node system
-		// perform the applications
-		// and at the end return the data from first return node
-		// return node will be same as object node, just with a return tag
-		// following -> save data and fn and have a next,
-		// result of one transform goes to the data of next application
-		//
-		// follow till you get to a return block
-	});
-
-	// memo(() => {
-	// 	if (!outputBuffers.value()) return;
-	// 	outputBuffers.value().forEach((id) => {
-	// 		let v = transform(inputParsed.value());
-	// 		store.apply(["buffers", id], "set", [node.id, v], false);
-	// 	});
-	// }, [outputBuffers]);
+		return executeAndReturn;
+	};
 
 	let cursor = dom(["textarea", {
 		type: "text",
@@ -388,7 +554,14 @@ let Function = (node, inputs) => {
 		},
 	}, key]);
 
-	return [cursor];
+	return [
+		button("compile", () => {
+			console.log("Compiled", outputBuffers.value());
+			let fn = compileFunction(outputBuffers.value());
+			update();
+		}),
+		cursor,
+	];
 	// will have a name
 	// will save name to node map vibes...
 };
@@ -429,6 +602,46 @@ let recieverVariable = (node, inputs, updateOut) => {
 	// update all the outputs
 };
 
+let applyFunction = (node, inputs, updateOut) => {
+	let r = dataR(getNodeLocation(node.id), node.id);
+	let key = r("name");
+	let _function = r("function");
+
+	let sub = store.subscribe(["variables", key.value()], (e) => {
+		if (e && e.function) _function.next(e.function);
+	});
+
+	_function.subscribe((v) => {
+		// console.log("FUCNTION", v);
+		// console.log("FUCNTION ASS", v.function({}));
+		updateOut();
+	});
+
+	// read the value, when value re run ...
+
+	let update = () => {
+		sub();
+		sub = store.subscribe(["variables", key.value()], (e) => {
+			if (e) _function.next(e);
+		});
+		let _value = store.get(["variables", key.value()]);
+		if (_value) _function.next(_value);
+	};
+
+	let cursor = dom(["textarea", {
+		type: "text",
+		oninput: (e) => {
+			key.next(e.target.value.trim());
+			update();
+		},
+	}, key]);
+
+	return [cursor];
+	// let R = dataR()
+	// will basically subscribe to variable manually
+	// update all the outputs
+};
+
 export let CreateVariable = {
 	id: "create-variable",
 	render: declareVariable,
@@ -443,7 +656,6 @@ export let CreateFunction = {
 	inputs: {},
 	outputs: {},
 	transform: (props) => {
-		console.log(props);
 		return {};
 	},
 };
@@ -461,9 +673,93 @@ export let ReadVariable = {
 	},
 };
 
+export let ApplyFunction = {
+	id: "apply-function",
+	render: applyFunction,
+	inputs: "ANY",
+	outputs: {},
+	transform: (props) => {
+		if (!props?.function) return {};
+		else if (typeof props.function == "function") {
+			console.log("Outting", props.function(props));
+			let out = { ...props.function(props) };
+			return out;
+		} else if (typeof props.function?.function == "function") {
+			console.log(
+				"Outting",
+				props.function.function,
+				props.function.function(props),
+			);
+			let out = { ...props.function.function(props) };
+			return out;
+		} else return {};
+	},
+};
+
 export let CompileObject = {
 	id: "ObjectMerge",
 	render: () => [dom(["span", " {...} "])],
+	inputs: "ANY",
+	outputs: {},
+	transform: (props) => {
+		if (!props) return {};
+		else if (typeof props == "object") {
+			return { ...props };
+		} else return {};
+	},
+};
+
+export let LogObject = {
+	id: "LOG",
+	render: (node, inputs) => {
+		const props = reactive("");
+		inputs.subscribe((v) => {
+			props.next(JSON.stringify(getProps(node.id), null, 2));
+		});
+
+		let clear = () => {
+			store.tr(getNodeLocation(node.id), "set", ["data", {}]);
+			props.next("{}");
+		};
+
+		return [
+			button("clear", clear),
+			dom(["pre", props]),
+		];
+	},
+	inputs: "ANY",
+	outputs: {},
+	transform: (props) => {
+		return {};
+	},
+};
+
+export let NamedObject = {
+	id: "NamedObject",
+	render: (node, ins, updateOut) => {
+		let r = dataR(getNodeLocation(node.id), node.id);
+		let key = r("key");
+		return [dom([".dawg", ["input", {
+			type: "text",
+			oninput: (e) => {
+				key.next(e.target.value.trim());
+				updateOut();
+			},
+		}], ["span", " {...} "]])];
+	},
+	inputs: "ANY",
+	outputs: {},
+	transform: (props) => {
+		if (!props || !props?.key) return {};
+		else if (typeof props == "object") {
+			return { [props.key]: { ...props } };
+		} else return {};
+	},
+};
+
+export let ReturnObject = {
+	id: "return",
+	render: () => [dom(["span", " RETURN {...} "])],
 	inputs: "ANY",
 	outputs: {},
 	transform: (props) => {
@@ -520,6 +816,17 @@ export let Slider = {
 	transform: (props) => props,
 };
 
+export let LineEditor = {
+	id: "lineEditor",
+	inputs: {
+		start: V.any({ x: 0, y: 0 }),
+		end: V.any({ x: 100, y: 100 }),
+	},
+	outputs: {},
+	render: line,
+	transform: (props) => props,
+};
+
 export let Slider2D = {
 	id: "slider2D",
 	inputs: {
@@ -531,6 +838,22 @@ export let Slider2D = {
 	transform: (props) => props,
 };
 
+export let Grid = {
+	id: "grid",
+	inputs: {
+		x: V.number(10),
+		y: V.number(10),
+		columns: V.number(10),
+		rows: V.number(10),
+		coord: V.array([2, 2]),
+	},
+	outputs: {},
+	render: grid2D,
+	transform: (props) => {
+		return { x: props.x, y: props.y };
+	},
+};
+
 export const ObjectLabeller = {
 	id: "Object",
 	render: objectPlexer,
@@ -540,6 +863,7 @@ export const ObjectLabeller = {
 	},
 	outputs: {},
 	transform: (props) => {
+		if (!props) return {};
 		const o = {};
 		o[props.key] = props.value;
 		return o;

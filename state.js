@@ -11,24 +11,29 @@ import { mountBoundingBox } from "./bigBoundingBox.js";
 import { createRegistery } from "./registery.js";
 import {
 	add,
+	ApplyFunction,
 	colorSliders,
 	CompileObject,
 	CreateFunction,
 	CreateVariable,
+	Grid,
+	LineEditor,
+	LogObject,
 	MathComps,
+	NamedObject,
 	ObjectLabeller,
 	ReadVariable,
+	ReturnObject,
 	Slider,
 	Slider2D,
 } from "./components/utils.js";
 import { renderCanvas } from "./canvas.js";
 import { V } from "./schema.js";
 
-import { Circle } from "./components/shapes.js";
+import { Circle, Line, Text } from "./components/shapes.js";
 
 let stringify = JSON.stringify;
 export let mouse = reactive({ x: 0, y: 0 });
-
 export let state = {
 	authSlug: reactive(""),
 	authKey: undefined,
@@ -60,7 +65,7 @@ export let state = {
 	canvasY: reactive(0),
 	canvasScale: reactive(1),
 
-	dimensions: reactive(10000),
+	dimensions: reactive(100000),
 	holdingCanvas: reactive(false),
 	canceled: reactive(false),
 
@@ -174,10 +179,13 @@ registery.register(
 	{},
 	renderCanvas,
 	(props) => {
-		return { draw: ["Group", props.draw] };
+		return { draw: ["Group", props] };
 	},
 );
 registery.register(Circle);
+registery.register(LogObject);
+registery.register(Text);
+registery.register(Grid);
 registery.register(ObjectLabeller);
 registery.register(MathComps.add);
 registery.register(MathComps.sub);
@@ -188,6 +196,11 @@ registery.register(CreateFunction);
 registery.register(CreateVariable);
 registery.register(ReadVariable);
 registery.register(CompileObject);
+registery.register(ReturnObject);
+registery.register(ApplyFunction);
+registery.register(Line);
+registery.register(LineEditor);
+registery.register(NamedObject);
 
 registery.register(
 	"colorSliders",
@@ -305,9 +318,11 @@ export let addNode = (node) => {
 		if (el) document.querySelector(".container").appendChild(el);
 	}, 10);
 };
-export let removeNode = (node) => {
-	let index = store.get(NODES).findIndex((e) => e.id == node.id);
-	if (index != -1) store.apply(NODES, "remove", [index, 1], false);
+export let removeNode = (nodeId) => {
+	let index = store.get(NODES).findIndex((e) => e.id == nodeId);
+	if (index != -1) {
+		store.apply(NODES, "remove", [index, 1], false);
+	}
 
 	// delete also since add node adds it
 	// if (el) document.querySelector('.container').appendChild(el)
@@ -334,12 +349,14 @@ export let addEdge = (edge) => {
 		state.reRenderEdges.next((e) => e + .0001);
 	} else notificationpopup("Connection Already Exists", true);
 };
+
 export let removeEdge = (edgeId) => {
 	let index = store.get(EDGES).findIndex((e) => e.id == edgeId);
 	if (index != -1) store.apply(EDGES, "remove", [index, 1]);
 
 	state.reRenderEdges.next((e) => e + .0001);
 };
+
 export let updateBuffers = () => {
 	// everytime nodes or edges change check if new nodes exist
 	// if new node exists then add a buffer for it
@@ -498,6 +515,7 @@ let set_channel = (slug) => {
 			}
 		});
 };
+
 let x1 = dragTransforms.startX;
 let x2 = dragTransforms.endX;
 let y1 = dragTransforms.startY;
@@ -519,6 +537,15 @@ let dragMarker = dom(svgrectnormal(
 				: "#0008",
 		[state.holdingCanvas, state.canceled],
 	),
+	4,
+	{
+		onclick: (e) => {
+			console.log(e);
+			if (e.altKey) {
+				console.log("ALT KEY");
+			}
+		},
+	},
 ));
 
 let R = (location) => ({
@@ -598,14 +625,10 @@ let edges = memo(() => {
 					state.selectedConnection,
 				]),
 				onpointerdown: (event) => {
-					console.log("Clicked?");
 					if (event.shiftKey) {
 						state.selectedConnection.next((a) => [...a, e.id]);
 					} else state.selectedConnection.next([e.id]);
 				},
-				// onmouseexit: () => {
-				// 	state.selected_connection = undefined;
-				// },
 			},
 		);
 	}).filter((e) => e != undefined);

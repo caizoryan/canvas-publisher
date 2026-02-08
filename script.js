@@ -4,6 +4,7 @@ import {
 	addNode,
 	registery,
 	removeEdge,
+	removeNode,
 	state,
 	store,
 	try_set_channel,
@@ -464,7 +465,15 @@ keys.on("cmd + d", downloadData, {
 	disable_in_input: true,
 	preventDefault: true,
 });
-keys.on("backspace", removeCurrentEdge, { disable_in_input: true, ...prevent });
+
+let remove = () => {
+	// if (state.selected.value().length == 1) {
+	// 	console.log("Removing? node?");
+	// 	removeNode(state.selected.value()[0]);
+	// }
+	removeCurrentEdge();
+};
+keys.on("backspace", remove, { disable_in_input: true, ...prevent });
 
 document.onkeydown = (e) => keys.event(e);
 

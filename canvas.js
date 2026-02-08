@@ -114,11 +114,16 @@ export const renderCanvas = (node, inputs) => {
 		const doc = new PDFDocument({
 			layout: "landscape",
 			size: [pageWidth, pageHeight],
+			margins: 0,
 		});
 
 		let fns = {
 			"Circle": drawCircleDocFn,
-			"Group": (drawables) => (doc) => {
+			"Text": drawTextDocFn,
+			"Line": drawLineDocFn,
+			"Group": (props) => (doc) => {
+				let drawables = props.draw ? props.draw : [];
+
 				drawables.forEach((fn) => {
 					if (!fn) return;
 					typeof fns[fn[0]] == "function"
@@ -131,7 +136,7 @@ export const renderCanvas = (node, inputs) => {
 		let stream = doc.pipe(blobStream());
 		doc.rect(0, 0, pageHeight, pageWidth);
 		doc.fill([0, 0, 0, 5]);
-		fns.Group(drawables)(doc);
+		fns.Group({ draw: drawables })(doc);
 		doc.end();
 		stream.on(
 			"finish",
@@ -159,10 +164,10 @@ export const renderCanvas = (node, inputs) => {
 
 let drawCircleDocFn = (props) => (doc) => {
 	doc.save();
-	doc.lineWidth(props.strokeWeight);
-	let x = props.x;
-	let y = props.y;
-	doc.circle(x, y, props.radius);
+	if (props.strokeWeight) doc.lineWidth(props.strokeWeight);
+	let x = props.x ? props.x : 0;
+	let y = props.y ? props.y : 0;
+	doc.circle(x, y, props.radius ? props.radius : 5);
 	if (props.stroke && props.fill) doc.fillAndStroke(props.fill, props.stroke);
 	else {
 		if (props.stroke) doc.stroke(props.stroke);
@@ -170,4 +175,40 @@ let drawCircleDocFn = (props) => (doc) => {
 	}
 
 	doc.restore();
+};
+
+let drawTextDocFn = (props) => (doc) => {
+	doc.save();
+	let x = props.x;
+	let y = props.y;
+	let width = props.width ? props.width : 100;
+	let height = props.height ? props.height : 100;
+	let text = props.text;
+	let fontSize = props.fontSize ? props.fontSize : 12;
+	// let stroke = props.stroke ? true : false;
+
+	if (props.fill) doc.fillColor(props.fill);
+	// if (props.stroke) doc.stroke(props.stroke);
+	doc.fontSize(fontSize);
+	doc.text(text, x, y, { width, height });
+	// if (props.stroke && props.fill) doc.fillAndStroke(props.fill, props.stroke);
+	// else {
+	// }
+
+	doc.restore();
+};
+
+let drawLineDocFn = (props) => (doc) => {
+	let start = props.start;
+	let x1 = start.x;
+	let y1 = start.y;
+
+	let end = props.end;
+	let x2 = end.x;
+	let y2 = end.y;
+
+	doc.lineWidth(props.strokeWeight);
+	doc.moveTo(x1, y1)
+		.lineTo(x2, y2);
+	if (props.stroke) doc.stroke(props.stroke);
 };

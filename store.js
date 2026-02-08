@@ -179,6 +179,7 @@ export let createStore = (internal) => {
 	let getref = (address, arr) => {
 		let copy = [...address];
 		let index = copy.shift();
+		if (!arr) return undefined;
 		if (copy.length == 0) return arr[index];
 		return getref(copy, arr[index]);
 	};

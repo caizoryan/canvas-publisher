@@ -18,10 +18,18 @@ import {
 	store,
 	subscribeToId,
 } from "./state.js";
+import { round } from "./components/utils.js";
 
 export let addToSelection = (block, e) => {
 	if (e.shiftKey) state.selected.next((e) => [...e, block.id]);
 	else state.selected.next([block.id]);
+};
+
+export let duplicateBlock = (props) => {
+	let block = {};
+	Object.assign(block, props);
+	block.id = block.id ? block.id : uuid();
+	addNode(block);
 };
 
 let nodeContainer = (node, attr, children) => {
@@ -41,18 +49,19 @@ let nodeContainer = (node, attr, children) => {
 	let onstart = (e) => {
 		if (e.altKey) {
 			// copy all props and make new
-			let n = {};
-			n.id = uuid();
-			n.type = node.type;
-			n.x = left.value() + 50;
-			n.y = top.value() + 50;
-			n.width = width.value();
-			n.height = height.value();
-			n.color = color.value();
-			let d = { ...store.get(getNodeLocation(node.id).concat(["data"])) };
-			n.data = d;
 
-			addNode(n);
+			let block = {};
+			block.type = node.type;
+			block.x = left.value() + 50;
+			block.y = top.value() + 50;
+			block.width = width.value();
+			block.height = height.value();
+			block.color = color.value();
+			let d = { ...store.get(getNodeLocation(node.id).concat(["data"])) };
+			block.data = d;
+
+			duplicateBlock(block);
+
 			return;
 		}
 		addToSelection(node, e);
@@ -81,8 +90,8 @@ let nodeContainer = (node, attr, children) => {
 			onstart,
 			onend,
 			set_position: (x, y) => {
-				left.next(x);
-				top.next(y);
+				left.next(round(x, 50));
+				top.next(round(y, 50));
 			},
 		});
 	}, 50);
@@ -120,7 +129,6 @@ export let createRegistery = () => {
 		let id = name;
 		console.log(id);
 		if (typeof name == "object") {
-			console.log("GOT OBJECT!?");
 			inputs = name.inputs;
 			outputs = name.outputs;
 			render = name.render;
@@ -143,7 +151,10 @@ export let createRegistery = () => {
 		let { render, inputs, outputs, transform } = components[node.type];
 
 		let _inputs = reactive({});
-		store.subscribe(BUFFERS.concat([node.id]), (e) => _inputs.next(e));
+		store.subscribe(
+			BUFFERS.concat([node.id]),
+			(e) => _inputs.next(e),
+		);
 		let timeout;
 		let activated = reactive(false);
 		_inputs.subscribe(() => {
@@ -171,6 +182,7 @@ export let createRegistery = () => {
 
 		let inputParsed = memo(() => {
 			let props = store.get(getNodeLocation(node.id).concat(["data"]));
+			if (!props) props = {};
 			if (typeof inputs == "object") {
 				Object.entries(inputs).forEach(([key, value]) => {
 					if (value.collects) props[key] = [];
@@ -259,6 +271,7 @@ export let createRegistery = () => {
 
 	let list = reactive(Object.keys(components));
 	let getTransformFn = (id) => components[id]?.transform;
+	let getInputs = (id) => components[id]?.inputs;
 
-	return { register, mount, list, getTransformFn };
+	return { register, mount, list, getTransformFn, getInputs };
 };

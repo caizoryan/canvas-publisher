@@ -38,6 +38,55 @@ const circleRender = (node, inputs) => {
 const rectRender = (node, inputs) => {
 };
 
+export const Line = {
+	id: "line",
+	render: () => [dom(["span", "line"])],
+	inputs: {
+		start: V.any({ x: 0, y: 0 }),
+		end: V.any({ x: 100, y: 100 }),
+		stroke: V.string("black"),
+		strokeWeight: V.number(5),
+		// v.or(v.string('black'), v.array([0,0,0,100]))
+	},
+	outputs: {},
+	transform: (props) => ({
+		draw: ["Line", props],
+	}),
+};
+
+export const Text = {
+	id: "text",
+	render: () => [dom(["span", "Text"])],
+	inputs: {
+		x: V.number(Math.random() * 500),
+		y: V.number(Math.random() * 500),
+		width: V.number(Math.random() * 500),
+		text: V.string("Hello world"),
+		fontSize: V.number(12),
+		fill: V.array([0, 0, 50, 15]),
+		// stroke: V.string("black"),
+		// v.or(v.string('black'), v.array([0,0,0,100]))
+	},
+	outputs: {},
+	transform: (props) => ({
+		draw: ["Text", props],
+	}),
+};
+
+export const Group = {
+	id: "text",
+	render: () => [dom(["span", "Text"])],
+	inputs: {
+		draw: V.array([]).collect(),
+		// stroke: V.string("black"),
+		// v.or(v.string('black'), v.array([0,0,0,100]))
+	},
+	outputs: {},
+	transform: (props) => ({
+		draw: ["Group", props.draw],
+	}),
+};
+
 export const Circle = {
 	id: "circle",
 	render: circleRender,

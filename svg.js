@@ -6,7 +6,6 @@ export let svgrectnormal = (
 	stroke = "blue",
 	strokewidth = 4,
 ) => {
-	// TODO: Move the memo outside and send inside
 	return ["rect", {
 		x,
 		y,

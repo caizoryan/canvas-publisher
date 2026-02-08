@@ -9,8 +9,17 @@ import {
 	Transform,
 	uuid,
 } from "./block.js";
-import { addNode, boundingToSide, state, store } from "./state.js";
+import {
+	addNode,
+	boundingToSide,
+	getNodeLocation,
+	state,
+	store,
+} from "./state.js";
 import { add_block } from "./arena.js";
+import { notificationpopup } from "./notification.js";
+import { duplicateBlock } from "./registery.js";
+import { addEdge } from "./state.js";
 
 let anchor = undefined;
 
@@ -77,6 +86,46 @@ export let dragTransforms = { startX, startY, endX, endY };
 /** @type {( "pan" | "making-block" | 'making-group' | 'select' | 'zoom' | 'connect' )}*/
 let dragAction = "pan";
 
+export let duplicateSelection = () => {
+	console.log("let diplicate these mpthjer frickers");
+	let nodeMap = {};
+	let nodes = state.selected.value();
+	nodes.forEach((n) => nodeMap[n] = uuid());
+
+	let edges = store.get(["data", "edges"]).filter((e) => {
+		let keys = Object.keys(nodeMap);
+		return keys.includes(e.fromNode) &&
+			keys.includes(e.toNode);
+	});
+
+	nodes.forEach((n) => {
+		let node = store.get(getNodeLocation(n));
+		let block = {};
+		block.id = nodeMap[n];
+		block.type = node.type;
+		block.x = node.x + 50;
+		block.y = node.y + 50;
+		block.width = node.width;
+		block.height = node.height;
+		block.color = node.color;
+		let d = { ...store.get(getNodeLocation(node.id).concat(["data"])) };
+		block.data = d;
+
+		duplicateBlock(block);
+	});
+
+	edges.forEach((edge) => {
+		let newEdge = { ...edge };
+		newEdge.fromNode = nodeMap[edge.fromNode];
+		newEdge.toNode = nodeMap[edge.toNode];
+		newEdge.id = uuid();
+		addEdge(newEdge);
+	});
+
+	state.selected.next(Object.values(nodeMap));
+	// find all edges that have both from and to
+};
+
 export let dragOperations = {
 	onpointerdown: (e) => {
 		let target = e.target;
@@ -85,12 +134,15 @@ export let dragOperations = {
 
 		state.canceled.next(false);
 		state.selected.next([]);
+		state.selectedConnection.next([]);
 
 		startX.next(e.offsetX);
 		startY.next(e.offsetY);
 		endX.next(e.offsetX);
 		endY.next(e.offsetY);
 
+		// TODO: Marker, return from here if alt key
+		// and duplicate all nodes and edges with renaming them
 		target.setPointerCapture(e.pointerId);
 
 		if (e.metaKey && e.shiftKey) dragAction = "making-group";
