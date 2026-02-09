@@ -216,14 +216,41 @@ let slider2D = (node, ins, updateOut) => {
 		{ style: stylememo },
 	]);
 
+	let snapSize = reactive(20);
+	let fullSizeGrid = [".full-size-grid", {
+		style: memo(
+			() => `background-size: ${snapSize.value()}px ${snapSize.value()}px`,
+			[
+				snapSize,
+			],
+		),
+	}];
+
+	let snap = ["input", {
+		style: "position: absolute;left: 6em;bottom: 1em;",
+		type: "range",
+		min: 1,
+		max: 100,
+		step: .5,
+		oninput: (e) => snapSize.next(parseFloat(e.target.value)),
+	}];
+
+	let magic = ["button", {
+		style: "position: absolute;left: 1em;bottom: 1em;",
+		onclick: () => {
+			let e = document.querySelector("#" + node.id);
+			if (e) e.style.backgroundColor = "#2222";
+		},
+	}, "magic"];
+
 	setTimeout(() => {
-		let set_left = (v) => x.next(round(v, 20));
-		let set_top = (v) => y.next(round(v, 20));
+		let set_left = (v) => x.next(round(v, snapSize.value()));
+		let set_top = (v) => y.next(round(v, snapSize.value()));
 
 		drag(cursor, { set_left, set_top });
 	}, 100);
 
-	return [cursor];
+	return [fullSizeGrid, cursor, snap, magic];
 };
 
 let line = (node, ins, updateOut) => {

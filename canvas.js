@@ -160,11 +160,19 @@ export const renderCanvas = (node, inputs) => {
 	inputs.subscribe(() => next = true);
 	requestAnimationFrame(RAFDraw);
 
+	let magic = ["button", {
+		onclick: () => {
+			let e = document.querySelector("#" + node.id);
+			if (e) e.style.backgroundColor = "#2222";
+		},
+	}, "magic"];
+
 	return [
 		canvas,
 		button("PIN", setPinned),
 		button("toggle", () => paused = !paused),
 		button("download", () => lastPdf ? window.open(lastPdf, "_blank") : null),
+		magic,
 	];
 };
 

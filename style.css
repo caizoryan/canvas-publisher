@@ -683,3 +683,15 @@ button[updated='true'] {
 	grid-template-columns: 350px 350px;
 	grid-gap: 15px;
 }
+
+.full-size-grid {
+	background-size: 20px 20px;
+	background-image: linear-gradient(to right,
+			#2224 1px,
+			transparent 3px),
+		linear-gradient(to bottom,
+			#2224 1px,
+			transparent 3px);
+	width: 100%;
+	height: 100%;
+}
