@@ -144,7 +144,11 @@ export let mul = (node, inputs, updateOut) => {
 		value: key,
 		oninput: (e) => {
 			let num = parseFloat(e.target.value.trim());
-			if (typeof num == "number") key.next(num);
+			console.log("NUM", num);
+			if (typeof num == "number" && !isNaN(num)) {
+				console.log("setting", num);
+				key.next(num);
+			}
 			updateOut();
 		},
 	}, key]);
@@ -181,6 +185,10 @@ let sliderAxis = (axis = "horizontal") => (node, ins, updateOut) => {
 		".psuedo-cursor.flex-center",
 		{ style: stylememo },
 	]);
+
+	setTimeout(() => {
+		updateOut();
+	});
 
 	setTimeout(() => {
 		let set_left = (v) => axis == "horizontal" ? x.next(v) : null;
@@ -543,9 +551,12 @@ let Function = (node, inputs) => {
 		},
 	}, key]);
 
+	setTimeout(() => {
+		update();
+	}, 50);
+
 	return [
 		button("compile", () => {
-			let fn = compileFunction(outputBuffers.value());
 			update();
 		}),
 		cursor,
@@ -777,7 +788,7 @@ export let MathComps = {
 	mul: {
 		id: "mul",
 		render: mul,
-		inputs: { value: V.number(0).collect(), start: V.number(1) },
+		inputs: { value: V.number(1).collect(), start: V.number(1) },
 		outputs: {},
 		transform: (props) => ({
 			value: props.value.reduce(

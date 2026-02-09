@@ -409,14 +409,14 @@ document.addEventListener("wheel", (e) => {
 	if (e.ctrlKey) {
 		// trackpad...
 		e.preventDefault();
-		state.canvasScale.next((f) => f - (e.deltaY / 800));
+		state.canvasScale.next((f) => f - (e.deltaY / 400));
 	} else if (e.metaKey) {
 		e.preventDefault();
-		state.canvasScale.next((f) => f - (e.deltaY / 2500));
+		state.canvasScale.next((f) => f - (e.deltaY / 1000));
 	} else if (state.trackpad_movement) {
 		e.preventDefault();
-		state.canvasY.next((f) => f + e.deltaY);
-		state.canvasX.next((f) => f + e.deltaX);
+		state.canvasY.next((f) => f + e.deltaY * 1.5);
+		state.canvasX.next((f) => f + e.deltaX * 1.5);
 	}
 }, { passive: false });
 

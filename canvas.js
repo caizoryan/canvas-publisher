@@ -19,13 +19,8 @@ pinnedContext.rect(20, 20, 150, 100);
 pinnedContext.stroke();
 
 let queued = {};
-try {
-	PDFJS.GlobalWorkerOptions.workerSrc = PDFWorker;
-	console.log("TRIED");
-} catch (e) {
-	window.pdfjsWorker = PDFWorker;
-	console.log("CAUGHT");
-}
+window.pdfjsWorker = PDFWorker;
+// window.pdfjsWorker = false;
 
 // ~~~~~~~~~~~~~~~~~~~
 export let R = (location, id) => (key) => ({
@@ -45,6 +40,7 @@ export let dataR = (location, id) => (key) => ({
 export const renderCanvas = (node, inputs) => {
 	let pageWidth = 612;
 	let pageHeight = 792;
+	let paused = true;
 
 	// let inputs = reactive({});
 	// // from for this node
@@ -103,6 +99,7 @@ export const renderCanvas = (node, inputs) => {
 		});
 	};
 
+	let lastPdf;
 	let draw = (drawables, ctx) => {
 		if (drawables.length == 0) return;
 		if (isPinned.value() && ctx != pinnedContext) {
@@ -120,6 +117,7 @@ export const renderCanvas = (node, inputs) => {
 		let fns = {
 			"Circle": drawCircleDocFn,
 			"Text": drawTextDocFn,
+			"Image": drawImageDocFn,
 			"Line": drawLineDocFn,
 			"Group": (props) => (doc) => {
 				let drawables = props.draw ? props.draw : [];
@@ -140,14 +138,17 @@ export const renderCanvas = (node, inputs) => {
 		doc.end();
 		stream.on(
 			"finish",
-			() => loadAndRender(stream.toBlobURL("application/pdf"), ctx),
+			() => {
+				lastPdf = stream.toBlobURL("application/pdf");
+				loadAndRender(lastPdf, ctx);
+			},
 		);
 	};
 
 	// wrap this in a RAF
 	let next = false;
 	function RAFDraw() {
-		if (next) {
+		if (next && !paused) {
 			// sort these into drawables and properties vibes (props can be width/height...)
 			let i = inputs.value();
 			if (i && i.draw) draw(i.draw, ctx);
@@ -159,7 +160,12 @@ export const renderCanvas = (node, inputs) => {
 	inputs.subscribe(() => next = true);
 	requestAnimationFrame(RAFDraw);
 
-	return [canvas, button("PIN", setPinned)];
+	return [
+		canvas,
+		button("PIN", setPinned),
+		button("toggle", () => paused = !paused),
+		button("download", () => lastPdf ? window.open(lastPdf, "_blank") : null),
+	];
 };
 
 let drawCircleDocFn = (props) => (doc) => {
@@ -191,6 +197,25 @@ let drawTextDocFn = (props) => (doc) => {
 	// if (props.stroke) doc.stroke(props.stroke);
 	doc.fontSize(fontSize);
 	doc.text(text, x, y, { width, height });
+	// if (props.stroke && props.fill) doc.fillAndStroke(props.fill, props.stroke);
+	// else {
+	// }
+
+	doc.restore();
+};
+
+let drawImageDocFn = (props) => (doc) => {
+	doc.save();
+	let x = props.x;
+	let y = props.y;
+	let image = props.image;
+
+	let width = props.width ? props.width : 100;
+
+	if (!props.image) return;
+	if (props.fill) doc.fillColor(props.fill);
+	// if (props.stroke) doc.stroke(props.stroke);
+	doc.image(image, x, y, { width });
 	// if (props.stroke && props.fill) doc.fillAndStroke(props.fill, props.stroke);
 	// else {
 	// }

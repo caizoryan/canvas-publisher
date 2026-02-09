@@ -30,7 +30,7 @@ import {
 import { renderCanvas } from "./canvas.js";
 import { V } from "./schema.js";
 
-import { Circle, Line, Text } from "./components/shapes.js";
+import { Circle, ImageElement, Line, Text } from "./components/shapes.js";
 
 let stringify = JSON.stringify;
 export let mouse = reactive({ x: 0, y: 0 });
@@ -182,7 +182,9 @@ registery.register(
 		return { draw: ["Group", props] };
 	},
 );
+
 registery.register(Circle);
+registery.register(ImageElement);
 registery.register(LogObject);
 registery.register(Text);
 registery.register(Grid);
