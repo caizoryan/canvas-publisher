@@ -167,10 +167,13 @@ export const renderCanvas = (node, inputs) => {
 	requestAnimationFrame(RAFDraw);
 
 	return [
+		[
+			".bottom-bar",
+			button("PIN", setPinned),
+			button("toggle", () => paused = !paused),
+			button("download", () => lastPdf ? window.open(lastPdf, "_blank") : null),
+		],
 		canvas,
-		button("PIN", setPinned),
-		button("toggle", () => paused = !paused),
-		button("download", () => lastPdf ? window.open(lastPdf, "_blank") : null),
 	];
 };
 

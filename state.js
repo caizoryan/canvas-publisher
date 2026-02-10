@@ -39,6 +39,9 @@ export let state = {
 	authKey: undefined,
 	me: {},
 
+	// 'connect' | 'resize'
+	mode: reactive("pan"),
+
 	sidebarOpen: reactive(false),
 	helpOpen: reactive(false),
 	making_node: "circle",

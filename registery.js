@@ -112,6 +112,7 @@ let nodeContainer = (node, attr, children) => {
 		".draggable.node",
 		{
 			id: node.id,
+			title: node.type,
 			style,
 			selected: isSelected,
 			"multi-selected": isMultiSelected,
@@ -156,7 +157,7 @@ export let createRegistery = () => {
 	// or maybe
 	// this should be called something like mount
 	let mount = (node) => {
-		let { render, inputs, outputs, transform } = components[node.type];
+		let { render, inputs, transform } = components[node.type];
 
 		let _inputs = reactive({});
 		store.subscribe(
@@ -229,8 +230,6 @@ export let createRegistery = () => {
 							value,
 						], false);
 					} else if (inputs[key] != undefined) {
-						// TODO: Make these transactions...
-
 						if (inputs[key].collects) {
 							store.tr(
 								getNodeLocation(node.id).concat(["data", key]),

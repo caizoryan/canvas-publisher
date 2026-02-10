@@ -17,15 +17,16 @@ export let objectPlexer = (node, inputs, updateOut) => {
 	let r = dataR(getNodeLocation(node.id), node.id);
 	let key = r("key");
 
-	let cursor = dom(["textarea", {
+	let cursor = dom(["input.object", {
 		type: "text",
 		oninput: (e) => {
 			key.next(e.target.value.trim());
 			updateOut();
 		},
-	}, key]);
+		value: key,
+	}]);
 
-	return [cursor];
+	return [["span", "{ "], cursor, ["span", " }"]];
 };
 
 export let colorSliders = (node, inputs, updateOut) => {
@@ -239,7 +240,12 @@ let slider2D = (node, ins, updateOut) => {
 		style: "position: absolute;left: 1em;bottom: 1em;",
 		onclick: () => {
 			let e = document.querySelector("#" + node.id);
-			if (e) e.style.backgroundColor = "#2222";
+			if (e) {
+				e.style.backgroundColor = "#8881";
+
+				if (e.style.pointerEvents == "none") e.style.pointerEvents = "auto";
+				else e.style.pointerEvents = "none";
+			}
 		},
 	}, "magic"];
 
@@ -757,8 +763,9 @@ export let NamedObject = {
 	render: (node, ins, updateOut) => {
 		let r = dataR(getNodeLocation(node.id), node.id);
 		let key = r("key");
-		return [dom([".dawg", ["input", {
+		return [dom([".dawg", ["input.object", {
 			type: "text",
+			value: key,
 			oninput: (e) => {
 				key.next(e.target.value.trim());
 				updateOut();

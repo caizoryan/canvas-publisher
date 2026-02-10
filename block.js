@@ -371,7 +371,11 @@ export function GroupElement(group) {
 }
 
 export const resizers = (left, top, width, height, opts = {}) => {
-	let MainCorner = dom(".absolute.flex-center.box.cur-se", {
+	let active = memo(() => state.mode.value() == "resize" ? "true" : "false", [
+		state.mode,
+	]);
+	let MainCorner = dom(".corner.absolute.flex-center.box.cur-se", {
+		active,
 		style: memo(() =>
 			CSSTransform(
 				width.value() - 15,
@@ -381,7 +385,8 @@ export const resizers = (left, top, width, height, opts = {}) => {
 			), [width, height]),
 	}, svgx(30));
 
-	let WidthMiddle = dom(".absolute.flex-center.box.cur-e", {
+	let WidthMiddle = dom(".corner.absolute.flex-center.box.cur-e", {
+		active,
 		style: memo(() =>
 			CSSTransform(
 				width.value() - 15,
@@ -391,7 +396,8 @@ export const resizers = (left, top, width, height, opts = {}) => {
 			), [width, height]),
 	}, svgx(30));
 
-	let HeightMiddle = dom(".absolute.flex-center.box.cur-s", {
+	let HeightMiddle = dom(".corner.absolute.flex-center.box.cur-s", {
+		active,
 		style: memo(() =>
 			CSSTransform(
 				15,
@@ -426,13 +432,18 @@ export const resizers = (left, top, width, height, opts = {}) => {
 
 export const connectors = (block, left, top, width, height, opts = {}) => {
 	let unwrapFn = (v) => typeof v == "function" ? v() : v;
-	let connectionPoint = (side, x, y) =>
-		dom(".edge-connector.absolute.flex-center.box", {
+	let connectionPoint = (side, x, y, axis) => {
+		let fullClass = axis == "horizontal" ? ".full-width" : ".full-height";
+		return dom(".edge-connector.absolute.flex-center.box" + fullClass, {
+			active: memo(() => state.mode.value() == "connect" ? "true" : "false", [
+				state.mode,
+			]),
 			style: memo(() => CSSTransform(unwrapFn(x), unwrapFn(y)), [
 				height,
 				width,
 			]),
 			onpointerdown: (e) => {
+				if (state.mode.value() != "connect") return;
 				e.stopImmediatePropagation();
 				e.stopPropagation();
 
@@ -478,19 +489,22 @@ export const connectors = (block, left, top, width, height, opts = {}) => {
 				}
 			},
 		}, "X");
+	};
 
 	let connectionPoints = [
-		connectionPoint("top", () => width.value() / 2, -15),
-		connectionPoint("left", -15, () => height.value() / 2),
+		connectionPoint("top", 0, -32, "horizontal"),
+		connectionPoint("left", -32, 0, "vertical"),
 		connectionPoint(
 			"bottom",
-			() => width.value() / 2,
-			() => height.value() - 15,
+			0,
+			() => height.value(),
+			"horizontal",
 		),
 		connectionPoint(
 			"right",
-			() => width.value() - 15,
-			() => height.value() / 2,
+			() => width.value(),
+			0,
+			"vertical",
 		),
 	];
 

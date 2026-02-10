@@ -141,6 +141,17 @@ const escape = () => {
 	state.canceled.next(true);
 	state.selected.next([]);
 	state.selectedConnection.next([]);
+
+	state.block_connection_buffer = undefined;
+
+	state.connectionFromX.next(0);
+	state.connectionFromY.next(0);
+	state.connectionToX.next(0);
+	state.connectionToY.next(0);
+
+	document.querySelectorAll(".wobble").forEach((e) =>
+		e.classList.toggle("wobble")
+	);
 };
 
 const saveCanvasToArena = () => {
@@ -462,6 +473,21 @@ keys.on("cmd + alt + r", registery.refreshData, {
 });
 
 keys.on("cmd + c", copySelection, {
+	disable_in_input: true,
+	preventDefault: true,
+});
+
+keys.on("shift + c", () => state.mode.next("connect"), {
+	disable_in_input: true,
+	preventDefault: true,
+});
+
+keys.on("shift + p", () => state.mode.next("pan"), {
+	disable_in_input: true,
+	preventDefault: true,
+});
+
+keys.on("shift + r", () => state.mode.next("resize"), {
 	disable_in_input: true,
 	preventDefault: true,
 });
