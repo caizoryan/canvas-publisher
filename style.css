@@ -330,9 +330,7 @@ button {
 }
 
 .node[selected='true'] {
-	border-width: 3px;
-	border-color: #00f;
-	/* box-shadow: 4px 4px 0 #ee07; */
+	border: 5px solid black;
 }
 
 .node[multi-selected='true'] {
@@ -417,6 +415,10 @@ pre {
 	color: #f45d;
 	font-weight: 600;
 	font-family: monospace;
+	height: 90%;
+	overflow-y: scroll;
+	border: 1px solid #222e;
+	padding: 1em;
 }
 
 code {
@@ -539,12 +541,17 @@ textarea {
 	padding: .5em;
 }
 
-input.object {
-	width: 80%;
-	height: 45%;
+input {
 	background: none;
 	outline: none;
 	border: 0px;
+}
+
+input.object,
+input.function,
+input.variable {
+	width: 80%;
+	height: 45%;
 }
 
 canvas.pinned {

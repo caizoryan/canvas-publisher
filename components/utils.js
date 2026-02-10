@@ -398,13 +398,14 @@ let declareVariable = (node, inputs) => {
 
 	inputs.subscribe(update);
 
-	let cursor = dom(["textarea", {
+	let cursor = dom(["input.variable", {
 		type: "text",
 		oninput: (e) => {
 			key.next(e.target.value.trim());
 			update();
 		},
-	}, key]);
+		value: key,
+	}]);
 
 	return [cursor];
 	// will have a name
@@ -576,13 +577,14 @@ let Function = (node, inputs) => {
 		return executeAndReturn;
 	};
 
-	let cursor = dom(["textarea", {
+	let cursor = dom(["input.function.definition", {
 		type: "text",
 		oninput: (e) => {
 			key.next(e.target.value.trim());
 			update();
 		},
-	}, key]);
+		value: key,
+	}]);
 
 	setTimeout(() => {
 		update();
@@ -620,13 +622,14 @@ let recieverVariable = (node, inputs, updateOut) => {
 		if (_value) value.next(_value);
 	};
 
-	let cursor = dom(["textarea", {
+	let cursor = dom(["input.variable", {
 		type: "text",
 		oninput: (e) => {
 			key.next(e.target.value.trim());
 			update();
 		},
-	}, key]);
+		value: key,
+	}]);
 
 	return [cursor];
 	// let R = dataR()
@@ -658,13 +661,14 @@ let applyFunction = (node, inputs, updateOut) => {
 		if (_value) _function.next(_value);
 	};
 
-	let cursor = dom(["textarea", {
+	let cursor = dom(["input.function.application", {
 		type: "text",
 		oninput: (e) => {
 			key.next(e.target.value.trim());
 			update();
 		},
-	}, key]);
+		value: key,
+	}]);
 
 	return [cursor];
 	// let R = dataR()

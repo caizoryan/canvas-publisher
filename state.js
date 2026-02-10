@@ -606,7 +606,7 @@ let edges = memo(() => {
 				return acc;
 			} else {
 				if (e.fromNode == f) return "#88f";
-				else if (e.toNode == f) return "#f88";
+				else if (e.toNode == f) return "#f8f";
 				else return false;
 			}
 		}, false);
