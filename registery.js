@@ -126,6 +126,7 @@ let nodeContainer = (node, attr, children) => {
 };
 export let createRegistery = () => {
 	let components = {};
+	let updateFunctions = [];
 	let register = (name, inputs, outputs, render, transform) => {
 		let id = name;
 		console.log(id);
@@ -144,6 +145,12 @@ export let createRegistery = () => {
 			transform,
 		};
 		list.next(Object.keys(components));
+	};
+
+	let refreshData = () => {
+		updateFunctions.forEach((fn) => {
+			if (typeof fn == "function") fn();
+		});
 	};
 
 	// or maybe
@@ -182,11 +189,17 @@ export let createRegistery = () => {
 		}
 
 		let inputParsed = memo(() => {
-			let props = store.get(getNodeLocation(node.id).concat(["data"]));
-			if (!props) props = {};
+			// let props = store.get(getNodeLocation(node.id).concat(["data"]));
+			// if (!props) props = {};
 			if (typeof inputs == "object") {
 				Object.entries(inputs).forEach(([key, value]) => {
-					if (value.collects) props[key] = [];
+					if (value.collects) {
+						store.tr(getNodeLocation(node.id).concat(["data"]), "set", [
+							key,
+							[],
+						], false);
+					}
+					// props[key] = [];
 				});
 			}
 
@@ -211,16 +224,33 @@ export let createRegistery = () => {
 					if (value == undefined) {
 						return;
 					} else if (typeof inputs == "string" && inputs == "ANY") {
-						props[key] = value;
+						store.tr(getNodeLocation(node.id).concat(["data"]), "set", [
+							key,
+							value,
+						], false);
 					} else if (inputs[key] != undefined) {
 						// TODO: Make these transactions...
-						if (inputs[key].collects) props[key].push(value);
-						else props[key] = value;
+
+						if (inputs[key].collects) {
+							store.tr(
+								getNodeLocation(node.id).concat(["data", key]),
+								"push",
+								value,
+								false,
+							);
+						} // props[key].push(value);
+						else {
+							store.tr(getNodeLocation(node.id).concat(["data"]), "set", [
+								key,
+								value,
+								false,
+							]);
+						}
 					}
 				});
 			});
 
-			return props;
+			return store.get(getNodeLocation(node.id).concat(["data"]));
 		}, [_inputs]);
 
 		// --------------
@@ -236,6 +266,8 @@ export let createRegistery = () => {
 			update.next((e) => e + 1);
 			// }, 150);
 		};
+
+		updateFunctions.push(updateBuffers);
 
 		if (transform) {
 			let _outputs = {
@@ -274,5 +306,5 @@ export let createRegistery = () => {
 	let getTransformFn = (id) => components[id]?.transform;
 	let getInputs = (id) => components[id]?.inputs;
 
-	return { register, mount, list, getTransformFn, getInputs };
+	return { register, mount, list, getTransformFn, getInputs, refreshData };
 };

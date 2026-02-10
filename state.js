@@ -617,7 +617,7 @@ let edges = memo(() => {
 			toT.x,
 			toT.y,
 			selection ? selection : "#ddd",
-			8,
+			3,
 			// 5,
 			0,
 			{

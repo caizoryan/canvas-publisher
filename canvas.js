@@ -37,6 +37,9 @@ export let dataR = (location, id) => (key) => ({
 	subscribe: (fn) => subscribeToId(id, ["data", key], fn),
 });
 
+let fontBuffer;
+const response = await fetch(`./font.otf`);
+fontBuffer = await response.arrayBuffer();
 export const renderCanvas = (node, inputs) => {
 	let pageWidth = 612;
 	let pageHeight = 792;
@@ -114,6 +117,9 @@ export const renderCanvas = (node, inputs) => {
 			margins: 0,
 		});
 
+		doc.registerFont("test", fontBuffer);
+		doc.font("test");
+
 		let fns = {
 			"Circle": drawCircleDocFn,
 			"Text": drawTextDocFn,
@@ -160,19 +166,11 @@ export const renderCanvas = (node, inputs) => {
 	inputs.subscribe(() => next = true);
 	requestAnimationFrame(RAFDraw);
 
-	let magic = ["button", {
-		onclick: () => {
-			let e = document.querySelector("#" + node.id);
-			if (e) e.style.backgroundColor = "#2222";
-		},
-	}, "magic"];
-
 	return [
 		canvas,
 		button("PIN", setPinned),
 		button("toggle", () => paused = !paused),
 		button("download", () => lastPdf ? window.open(lastPdf, "_blank") : null),
-		magic,
 	];
 };
 
@@ -205,6 +203,9 @@ let drawTextDocFn = (props) => (doc) => {
 	// if (props.stroke) doc.stroke(props.stroke);
 	doc.fontSize(fontSize);
 	doc.text(text, x, y, { width, height });
+	doc.rect(x, y, width, height);
+	doc.lineWidth(1);
+	doc.stroke();
 	// if (props.stroke && props.fill) doc.fillAndStroke(props.fill, props.stroke);
 	// else {
 	// }
@@ -213,6 +214,7 @@ let drawTextDocFn = (props) => (doc) => {
 };
 
 let drawImageDocFn = (props) => (doc) => {
+	// return;
 	doc.save();
 	let x = props.x;
 	let y = props.y;
@@ -231,6 +233,24 @@ let drawImageDocFn = (props) => (doc) => {
 	doc.restore();
 };
 
+let drawImageCanvasFn = (props) => (ctx, canvas) => {
+	let x = props.x;
+	let y = props.y;
+	let image = props.image;
+
+	let width = props.width ? props.width : 100;
+
+	if (!props.image) return;
+	if (props.fill) doc.fillColor(props.fill);
+	const ratio = img.height / img.width;
+	const targetHeight = targetWidth * ratio;
+
+	canvas.width = targetWidth;
+	canvas.height = targetHeight;
+
+	ctx.drawImage(img, x, y, targetWidth, targetHeight);
+};
+
 let drawLineDocFn = (props) => (doc) => {
 	let start = props.start;
 	let x1 = start.x;
@@ -240,8 +260,10 @@ let drawLineDocFn = (props) => (doc) => {
 	let x2 = end.x;
 	let y2 = end.y;
 
+	doc.save();
 	doc.lineWidth(props.strokeWeight);
 	doc.moveTo(x1, y1)
 		.lineTo(x2, y2);
 	if (props.stroke) doc.stroke(props.stroke);
+	doc.restore();
 };

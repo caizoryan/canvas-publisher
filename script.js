@@ -456,6 +456,11 @@ keys.on("cmd + v", pasteInBlock, {
 	preventDefault: true,
 });
 
+keys.on("cmd + alt + r", registery.refreshData, {
+	disable_in_input: true,
+	preventDefault: true,
+});
+
 keys.on("cmd + c", copySelection, {
 	disable_in_input: true,
 	preventDefault: true,
