@@ -541,17 +541,17 @@ textarea {
 	padding: .5em;
 }
 
-input {
-	background: none;
-	outline: none;
-	border: 0px;
-}
+input {}
 
 input.object,
 input.function,
+input.number,
 input.variable {
 	width: 80%;
 	height: 45%;
+	background: none;
+	outline: none;
+	border: 0px;
 }
 
 canvas.pinned {

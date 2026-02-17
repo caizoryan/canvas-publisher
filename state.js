@@ -12,6 +12,7 @@ import { createRegistery } from "./registery.js";
 import {
 	add,
 	ApplyFunction,
+	CollectObjects,
 	colorSliders,
 	CompileObject,
 	CreateFunction,
@@ -21,11 +22,13 @@ import {
 	LogObject,
 	MathComps,
 	NamedObject,
+	Number,
 	ObjectLabeller,
 	ReadVariable,
 	ReturnObject,
 	Slider,
 	Slider2D,
+	String,
 } from "./components/utils.js";
 import { renderCanvas } from "./canvas.js";
 import { V } from "./schema.js";
@@ -187,6 +190,7 @@ registery.register(
 );
 
 registery.register(Circle);
+registery.register(String);
 registery.register(ImageElement);
 registery.register(LogObject);
 registery.register(Text);
@@ -203,6 +207,8 @@ registery.register(ReadVariable);
 registery.register(CompileObject);
 registery.register(ReturnObject);
 registery.register(ApplyFunction);
+registery.register(Number);
+registery.register(CollectObjects);
 registery.register(Line);
 registery.register(LineEditor);
 registery.register(NamedObject);
@@ -351,15 +357,72 @@ export let addEdge = (edge) => {
 	if (!exists) {
 		addBuffer(edge.id);
 		store.tr(EDGES, "push", edge);
-		state.reRenderEdges.next((e) => e + .0001);
+		mountEdge(edge);
+		// state.reRenderEdges.next((e) => e + .0001);
 	} else notificationpopup("Connection Already Exists", true);
+};
+
+let mountEdge = (edge) => {
+	let from = R(getNodeLocation(edge.fromNode), edge.fromNode);
+	let to = R(getNodeLocation(edge.toNode), edge.toNode);
+
+	if (!(from && to)) return;
+
+	let selectionColor = memo(() => {
+		let ret = state.selected.value().reduce((acc, f) => {
+			if (acc != "#ddd") {
+				return acc;
+			} else {
+				if (edge.fromNode == f) return "#88f";
+				else if (edge.toNode == f) return "#f8f";
+				else return acc;
+			}
+		}, "#ddd");
+		return ret;
+	}, [state.selected]);
+
+	let fromT = memo(() => boundingToSide(from.value(), edge.fromSide), [from]);
+	let toT = memo(() => boundingToSide(to.value(), edge.toSide), [to]);
+
+	let x1 = memo(() => fromT.value().x, [fromT]);
+	let y1 = memo(() => fromT.value().y, [fromT]);
+
+	let x2 = memo(() => toT.value().x, [toT]);
+	let y2 = memo(() => toT.value().y, [toT]);
+
+	let el = ["line", {
+		selected: memo(() => state.selectedConnection.value().includes(edge.id), [
+			state.selectedConnection,
+		]),
+		x1,
+		y1,
+		x2,
+		y2,
+		stroke: selectionColor,
+		"marker-start": "url(#x)",
+		"marker-end": "url(#arrow)",
+		"stroke-width": 3,
+		id: "edge-" + edge.id,
+		class: "connection-line",
+		// onpointerdown: (event) => {
+		// 	if (event.shiftKey) {
+		// 		state.selectedConnection.next((a) => [...a, e.id]);
+		// 	} else state.selectedConnection.next([e.id]);
+		// },
+	}];
+
+	setTimeout(() => {
+		document.querySelector("svg.background").appendChild(dom(el));
+	}, 10);
 };
 
 export let removeEdge = (edgeId) => {
 	let index = store.get(EDGES).findIndex((e) => e.id == edgeId);
-	if (index != -1) store.apply(EDGES, "remove", [index, 1]);
-
-	state.reRenderEdges.next((e) => e + .0001);
+	if (index != -1) {
+		store.apply(EDGES, "remove", [index, 1]);
+		let edge = document.querySelector("#edge-" + edgeId);
+		if (edge) edge.remove();
+	}
 };
 
 export let updateBuffers = () => {
@@ -502,10 +565,7 @@ let set_channel = (slug) => {
 				state.currentSlug.next(slug);
 				updateData(res.data);
 
-				// let blocks = processBlockForRendering(res.data)
-				// let groups = store.get(NODES).filter(e => e.type == 'group')
 				let svg = svgBackground();
-				// let els = store.get(NODES).map(registery)
 
 				mountContainer([
 					// ...groups.map(GroupElement),
@@ -513,10 +573,6 @@ let set_channel = (slug) => {
 					mountBoundingBox(),
 					// ...blocks.map(BlockElement),
 				]);
-
-				// addToRecents(slug)
-				// setSlug(slug)
-				// localStorage.setItem('slug', slug)
 			}
 		});
 };
@@ -590,58 +646,6 @@ export let boundingToSide = (b, side) => {
 	}
 };
 
-// have to change this to be the same way nodes are
-// WE DONT WANNA MAKE NEW SVG LINES EVERY UPDATE!!!
-// THIS IS HORRIBLE
-let edges = memo(() => {
-	if (!store.get(["data", "edges"])) return [];
-	return store.get(["data", "edges"]).map((e) => {
-		let from = store.get(["data", "nodes"]).find((f) => f.id == e.fromNode);
-		let to = store.get(["data", "nodes"]).find((f) => f.id == e.toNode);
-
-		if (!(from && to)) return;
-
-		let selection = state.selected.value().reduce((acc, f) => {
-			if (acc) {
-				return acc;
-			} else {
-				if (e.fromNode == f) return "#88f";
-				else if (e.toNode == f) return "#f8f";
-				else return false;
-			}
-		}, false);
-
-		let fromT = boundingToSide(from, e.fromSide);
-		let toT = boundingToSide(to, e.toSide);
-
-		return svgline(
-			fromT.x,
-			fromT.y,
-			toT.x,
-			toT.y,
-			selection ? selection : "#ddd",
-			3,
-			// 5,
-			0,
-			{
-				id: "edge-" + e.id,
-				class: "connection-line",
-				selected: memo(() => state.selectedConnection.value().includes(e.id), [
-					state.selectedConnection,
-				]),
-				onpointerdown: (event) => {
-					if (event.shiftKey) {
-						state.selectedConnection.next((a) => [...a, e.id]);
-					} else state.selectedConnection.next([e.id]);
-				},
-			},
-		);
-	}).filter((e) => e != undefined);
-}, [
-	R(["data", "edges"]),
-	state.reRenderEdges,
-]);
-
 state.selected.subscribe(() => {
 	state.reRenderEdges.next((e) => e + 1);
 });
@@ -664,7 +668,6 @@ let svgBackground = () => {
 		makeXMarker(.4),
 		currentConnection,
 		dragMarker,
-		edges,
 	];
 };
 
@@ -732,10 +735,6 @@ let updateData = (blocks) => {
 
 		// setNodes(nodes)
 	}
-};
-let processBlockForRendering = (blocks) => {
-	blocks = blocks.filter((e) => e.title != ".book");
-	return blocks;
 };
 
 memo(() => {

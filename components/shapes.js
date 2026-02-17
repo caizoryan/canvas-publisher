@@ -100,8 +100,7 @@ export const Line = {
 	id: "line",
 	render: () => [dom(["span", "line"])],
 	inputs: {
-		start: V.any({ x: 0, y: 0 }),
-		end: V.any({ x: 100, y: 100 }),
+		points: V.array([{ x: 0, y: 0 }, { x: 100, y: 100 }]),
 		stroke: V.string("black"),
 		strokeWeight: V.number(5),
 		// v.or(v.string('black'), v.array([0,0,0,100]))
@@ -135,8 +134,9 @@ export const Text = {
 		width: V.number(Math.random() * 500),
 		height: V.number(Math.random() * 500),
 		text: V.string("Hello world"),
+		boundingBox: V.number(0),
 		fontSize: V.number(12),
-		fontFamily: V.string("monospace"),
+		fontFamily: V.string("Times-Roman"),
 		fill: V.array([0, 0, 50, 15]),
 		// stroke: V.string("black"),
 		// v.or(v.string('black'), v.array([0,0,0,100]))

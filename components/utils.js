@@ -84,15 +84,27 @@ export let colorSliders = (node, inputs, updateOut) => {
 export let add = (node, inputs, updateOut) => {
 	// Make an R out of key
 	let update = inputs;
-	let props = getProps(node.id);
-	let val = reactive(props.value.reduce((acc, v) => acc += v, 0));
+	// let props = getProps(node.id);
 
+	let calculate = () => {
+		let props = getProps(node.id);
+		let added = {};
+		props.value.forEach((obj) => {
+			if (!obj) return;
+			Object.entries(obj).forEach(
+				([key, value]) => {
+					if (added[key] && typeof added[key] == "number") {
+						added[key] += value;
+					} else added[key] = value;
+				},
+			);
+		});
+		return added.value ? added.value : 0;
+	};
+
+	let val = reactive(calculate());
 	update.subscribe(() => {
-		props = getProps(node.id);
-		val.next(
-			props.value.reduce((acc, v) => acc += v, 0)
-				.toFixed(2),
-		);
+		val.next(calculate().toFixed(2));
 	});
 
 	let cursor = dom(["code", "+ ", ["span", val]]);
@@ -260,27 +272,42 @@ let slider2D = (node, ins, updateOut) => {
 };
 
 let line = (node, ins, updateOut) => {
-	let props = getProps(node.id);
 	let r = dataR(getNodeLocation(node.id), node.id);
-	let start = r("start");
-	let end = r("end");
-	start.subscribe(() => updateOut());
-	end.subscribe(() => updateOut());
+	let points = r("points");
+	let start = memo(() => points.value() ? points.value()[0] : { x: 0, y: 0 }, [
+		points,
+	]);
 
-	let startStyle = memo(() => `
-		left: ${start.value().x}px;
-		top:  ${start.value().y}px;
-	`, [start]);
+	let end = memo(() => points.value() ? points.value()[1] : { x: 0, y: 0 }, [
+		points,
+	]);
+
+	points.subscribe(() => updateOut());
+
+	let startStyle = memo(() => {
+		let s = start.value();
+		console.log(s);
+		if (!s) s = { x: 0, y: 0 };
+		return `
+		left: ${s.x}px;
+		top:  ${s.y}px;
+	`;
+	}, [start]);
 
 	let startCursor = dom([
 		".psuedo-cursor.flex-center",
 		{ style: startStyle },
 	]);
 
-	let endStyle = memo(() => `
-		left: ${end.value().x}px;
-		top:  ${end.value().y}px;
-	`, [end]);
+	let endStyle = memo(() => {
+		let s = end.value();
+		console.log(s);
+		if (!s) s = { x: 10, y: 50 };
+		return `
+		left: ${s.x}px;
+		top:  ${s.y}px;
+	`;
+	}, [end]);
 
 	let endCursor = dom([
 		".psuedo-cursor.flex-center",
@@ -289,11 +316,13 @@ let line = (node, ins, updateOut) => {
 
 	setTimeout(() => {
 		let set_start_position = (x, y) => {
-			start.next({ x, y });
+			points.next([{ x, y }, points.value()[1]]);
+			console.log(points.value());
 		};
 
 		let set_end_position = (x, y) => {
-			end.next({ x, y });
+			points.next([points.value()[0], { x, y }]);
+			console.log(points.value());
 		};
 
 		drag(startCursor, { set_position: set_start_position });
@@ -506,21 +535,25 @@ let Function = (node, inputs) => {
 			sorted[position + ""] = value;
 		});
 
-		Object.values(sorted).forEach((p) => {
-			if (!p) return;
+		if (inputs == "COLLECTS") {
+			props.value = Object.values(sorted);
+		} else {
+			Object.values(sorted).forEach((p) => {
+				if (!p) return;
 
-			Object.entries(p).forEach(([key, value]) => {
-				if (value == undefined) {
-					return;
-				} else if (typeof inputs == "string" && inputs == "ANY") {
-					props[key] = value;
-				} else if (inputs[key] != undefined) {
-					// TODO: Make these transactions...
-					if (inputs[key].collects) props[key].push(value);
-					else props[key] = value;
-				}
+				Object.entries(p).forEach(([key, value]) => {
+					if (value == undefined) {
+						return;
+					} else if (typeof inputs == "string" && inputs == "ANY") {
+						props[key] = value;
+					} else if (inputs[key] != undefined) {
+						// TODO: Make these transactions...
+						if (inputs[key].collects) props[key].push(value);
+						else props[key] = value;
+					}
+				});
 			});
-		});
+		}
 
 		return props;
 	};
@@ -737,6 +770,19 @@ export let CompileObject = {
 	},
 };
 
+export let CollectObjects = {
+	id: "ObjectCollect",
+	render: () => [dom(["span", " [ {...} ] "])],
+	inputs: "COLLECTS",
+	outputs: {},
+	transform: (props) => {
+		if (!props) return {};
+		else if (typeof props == "object") {
+			return { ...props };
+		} else return {};
+	},
+};
+
 export let LogObject = {
 	id: "LOG",
 	render: (node, inputs) => {
@@ -803,11 +849,25 @@ export let MathComps = {
 	add: {
 		id: "add",
 		render: add,
-		inputs: { value: V.number(0).collect() },
+		inputs: "COLLECTS",
 		outputs: {},
-		transform: (props) => ({
-			value: props.value.reduce((acc, v) => acc += v, 0),
-		}),
+		transform: (props) => {
+			let added = {};
+			props.value.forEach((obj) => {
+				if (!obj) return;
+				Object.entries(obj).forEach(
+					([key, value]) => {
+						if (added[key] && typeof added[key] == "number") {
+							added[key] += value;
+						} else added[key] = value;
+					},
+				);
+			});
+			return added;
+			// ({
+			// 		value: props.value.reduce((acc, v) => acc += v, 0),
+			// 	}),
+		},
 	},
 
 	sub: {
@@ -845,11 +905,55 @@ export let Slider = {
 	transform: (props) => props,
 };
 
+export let String = {
+	id: "string",
+	inputs: { value: V.string("") },
+	outputs: {},
+	render: (node, i, updateOut) => {
+		let r = dataR(getNodeLocation(node.id), node.id);
+		let key = r("value");
+
+		let text = dom(["textarea", {
+			type: "text",
+			oninput: (e) => {
+				key.next(e.target.value.trim());
+				updateOut();
+			},
+			value: key,
+		}, key]);
+
+		return [dom(["span", "STRING"]), text];
+	},
+	transform: (props) => props,
+};
+
+export let Number = {
+	id: "number",
+	inputs: { value: V.number(1) },
+	outputs: {},
+	render: (node, i, updateOut) => {
+		let r = dataR(getNodeLocation(node.id), node.id);
+		let key = r("value");
+
+		let text = dom(["input.number", {
+			type: "number",
+			oninput: (e) => {
+				let v = parseFloat(e.target.value);
+				if (!isNaN(v) && typeof v == "number") key.next(v);
+				updateOut();
+			},
+			value: key,
+		}]);
+
+		return [text];
+	},
+	transform: (props) => props,
+};
+
 export let LineEditor = {
 	id: "lineEditor",
 	inputs: {
-		start: V.any({ x: 0, y: 0 }),
-		end: V.any({ x: 100, y: 100 }),
+		points: V.any([{ x: 0, y: 0 }, { x: 100, y: 100 }]),
 	},
 	outputs: {},
 	render: line,

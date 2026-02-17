@@ -3,7 +3,11 @@ const any = (v) => {
 		collects: false,
 		collect: () => {
 			root.collects = true;
-			root.default = root.default == undefined ? [] : [root.default];
+			root.default = root.default == undefined
+				? []
+				: Array.isArray(root.default)
+					? root.default
+					: [root.default];
 			return root;
 		},
 		default: v,

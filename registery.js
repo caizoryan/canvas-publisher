@@ -202,6 +202,11 @@ export let createRegistery = () => {
 					}
 					// props[key] = [];
 				});
+			} else if (inputs == "COLLECTS") {
+				store.tr(getNodeLocation(node.id).concat(["data"]), "set", [
+					"value",
+					[],
+				], false);
 			}
 
 			// sort inputs first based on edges
@@ -218,36 +223,46 @@ export let createRegistery = () => {
 				sorted[position + ""] = value;
 			});
 
-			Object.values(sorted).forEach((p) => {
-				if (!p) return;
+			if (inputs == "COLLECTS") {
+				let values = Object.values(sorted);
+				values = values.filter((e) => e != undefined);
 
-				Object.entries(p).forEach(([key, value]) => {
-					if (value == undefined) {
-						return;
-					} else if (typeof inputs == "string" && inputs == "ANY") {
-						store.tr(getNodeLocation(node.id).concat(["data"]), "set", [
-							key,
-							value,
-						], false);
-					} else if (inputs[key] != undefined) {
-						if (inputs[key].collects) {
-							store.tr(
-								getNodeLocation(node.id).concat(["data", key]),
-								"push",
-								value,
-								false,
-							);
-						} // props[key].push(value);
-						else {
+				store.tr(getNodeLocation(node.id).concat(["data"]), "set", [
+					"value",
+					values,
+				], false);
+			} else {
+				Object.values(sorted).forEach((p) => {
+					if (!p) return;
+
+					Object.entries(p).forEach(([key, value]) => {
+						if (value == undefined) {
+							return;
+						} else if (typeof inputs == "string" && inputs == "ANY") {
 							store.tr(getNodeLocation(node.id).concat(["data"]), "set", [
 								key,
 								value,
-								false,
-							]);
+							], false);
+						} else if (inputs[key] != undefined) {
+							if (inputs[key].collects) {
+								store.tr(
+									getNodeLocation(node.id).concat(["data", key]),
+									"push",
+									value,
+									false,
+								);
+							} // props[key].push(value);
+							else {
+								store.tr(getNodeLocation(node.id).concat(["data"]), "set", [
+									key,
+									value,
+									false,
+								]);
+							}
 						}
-					}
+					});
 				});
-			});
+			}
 
 			return store.get(getNodeLocation(node.id).concat(["data"]));
 		}, [_inputs]);

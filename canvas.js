@@ -117,8 +117,7 @@ export const renderCanvas = (node, inputs) => {
 			margins: 0,
 		});
 
-		doc.registerFont("test", fontBuffer);
-		doc.font("test");
+		doc.registerFont("hermit", fontBuffer);
 
 		let fns = {
 			"Circle": drawCircleDocFn,
@@ -192,6 +191,8 @@ let drawCircleDocFn = (props) => (doc) => {
 	doc.restore();
 };
 
+let availableFonts = ["Times-Roman", "hermit"];
+
 let drawTextDocFn = (props) => (doc) => {
 	doc.save();
 	let x = props.x;
@@ -200,18 +201,21 @@ let drawTextDocFn = (props) => (doc) => {
 	let height = props.height ? props.height : 100;
 	let text = props.text;
 	let fontSize = props.fontSize ? props.fontSize : 12;
+	let fontFamily = props.fontFamily;
 	// let stroke = props.stroke ? true : false;
 
 	if (props.fill) doc.fillColor(props.fill);
+	if (fontFamily && availableFonts.includes(fontFamily)) doc.font(fontFamily);
 	// if (props.stroke) doc.stroke(props.stroke);
 	doc.fontSize(fontSize);
 	doc.text(text, x, y, { width, height });
-	doc.rect(x, y, width, height);
-	doc.lineWidth(1);
-	doc.stroke();
+
+	if (props.boundingBox) {
+		doc.rect(x, y, width, height);
+		doc.lineWidth(props.boundingBox);
+		doc.stroke();
+	}
 	// if (props.stroke && props.fill) doc.fillAndStroke(props.fill, props.stroke);
-	// else {
-	// }
 
 	doc.restore();
 };
@@ -255,18 +259,26 @@ let drawImageCanvasFn = (props) => (ctx, canvas) => {
 };
 
 let drawLineDocFn = (props) => (doc) => {
-	let start = props.start;
-	let x1 = start.x;
-	let y1 = start.y;
-
-	let end = props.end;
-	let x2 = end.x;
-	let y2 = end.y;
+	let points = props.points;
+	if (props.points.length < 2) return;
+	// let start = points[0];
+	// let x1 = start.x;
+	// let y1 = start.y;
+	//
+	// let end = points[1];
+	// let x2 = end.x;
+	// let y2 = end.y;
 
 	doc.save();
 	doc.lineWidth(props.strokeWeight);
-	doc.moveTo(x1, y1)
-		.lineTo(x2, y2);
+	doc.moveTo(points[0].x, points[0].y);
+	points.slice(1).filter((e) =>
+		e != undefined &&
+		typeof e == "object"
+	).forEach(
+		(e) => doc.lineTo(e.x, e.y),
+	);
+	// .lineTo(x2, y2);
 	if (props.stroke) doc.stroke(props.stroke);
 	doc.restore();
 };
