@@ -1,4 +1,5 @@
 import { memo } from "./chowk.js";
+import { round } from "./components/utils.js";
 import { dom } from "./dom.js";
 import { drag } from "./drag.js";
 import { duplicateSelection } from "./dragOperations.js";
@@ -105,12 +106,12 @@ export let mountBoundingBox = () => {
 		};
 
 		anchored.forEach((e) => {
-			store.tr(e.blockLocation, "set", ["x", e.offset.x + diff.x]);
-			store.tr(e.blockLocation, "set", ["y", e.offset.y + diff.y]);
+			store.tr(e.blockLocation, "set", ["x", round(e.offset.x + diff.x, 50)]);
+			store.tr(e.blockLocation, "set", ["y", round(e.offset.y + diff.y, 50)]);
 		});
 
-		bigbox.style.left = x + "px";
-		bigbox.style.top = y + "px";
+		bigbox.style.left = round(x, 50) + "px";
+		bigbox.style.top = round(y, 50) + "px";
 	};
 
 	setTimeout(() => {

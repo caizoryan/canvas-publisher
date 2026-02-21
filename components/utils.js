@@ -223,7 +223,7 @@ let slider2D = (node, ins, updateOut) => {
 	let stylememo = memo(() => `
 		left: ${x.value()}px;
 		top:  ${y.value()}px;
-	`, [x]);
+	`, [x, y]);
 	let cursor = dom([
 		".psuedo-cursor.flex-center",
 		{ style: stylememo },
@@ -934,6 +934,9 @@ export let Number = {
 	render: (node, i, updateOut) => {
 		let r = dataR(getNodeLocation(node.id), node.id);
 		let key = r("value");
+
+		key.subscribe((v) => console.log("NUmber changed", v));
+		key.subscribe((v) => text.value = v);
 
 		let text = dom(["input.number", {
 			type: "number",

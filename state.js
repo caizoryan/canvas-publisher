@@ -30,7 +30,7 @@ import {
 	Slider2D,
 	String,
 } from "./components/utils.js";
-import { renderCanvas } from "./canvas.js";
+import { physariumCanvas, renderCanvas, renderPDFCanvas } from "./canvas.js";
 import { V } from "./schema.js";
 
 import { Circle, ImageElement, Line, Text } from "./components/shapes.js";
@@ -184,6 +184,33 @@ registery.register(
 	},
 	{},
 	renderCanvas,
+	(props) => {
+		return { draw: ["Group", props] };
+	},
+);
+
+registery.register(
+	"physariumCanvas",
+	{
+		x: V.number(0),
+		y: V.number(0),
+		draw: V.array().collect(),
+	},
+	{},
+	physariumCanvas,
+	(props) => {
+		let drawables = props.draw;
+		return { draw: ["Group", { draw: drawables }] };
+	},
+);
+
+registery.register(
+	"pdfCanvas",
+	{
+		draw: V.array().collect(),
+	},
+	{},
+	renderPDFCanvas,
 	(props) => {
 		return { draw: ["Group", props] };
 	},
@@ -370,14 +397,14 @@ let mountEdge = (edge) => {
 
 	let selectionColor = memo(() => {
 		let ret = state.selected.value().reduce((acc, f) => {
-			if (acc != "#ddd") {
+			if (acc != "#ddd4") {
 				return acc;
 			} else {
 				if (edge.fromNode == f) return "#88f";
 				else if (edge.toNode == f) return "#f8f";
 				else return acc;
 			}
-		}, "#ddd");
+		}, "#ddd4");
 		return ret;
 	}, [state.selected]);
 
