@@ -109,7 +109,10 @@ export let duplicateSelection = () => {
 		block.height = node.height;
 		block.color = node.color;
 		let d = { ...store.get(getNodeLocation(node.id).concat(["data"])) };
+		let _d = { ...store.get(getNodeLocation(node.id).concat(["_data"])) };
 		block.data = d;
+		block._data = _d;
+		console.log("DAWG ", _d);
 
 		duplicateBlock(block);
 	});
@@ -221,6 +224,7 @@ export let dragOperations = {
 				type: state.making_node,
 				id: uuid(),
 				data: {},
+				_data: {},
 			});
 		} // else if (dragAction == 'making-group') {
 		// 	dragAction = 'pan'

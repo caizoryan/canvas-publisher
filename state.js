@@ -23,6 +23,7 @@ import {
 	MathComps,
 	NamedObject,
 	Number,
+	ObjectExtracter,
 	ObjectLabeller,
 	ReadVariable,
 	ReturnObject,
@@ -223,6 +224,7 @@ registery.register(LogObject);
 registery.register(Text);
 registery.register(Grid);
 registery.register(ObjectLabeller);
+registery.register(ObjectExtracter);
 registery.register(MathComps.add);
 registery.register(MathComps.sub);
 registery.register(MathComps.mul);

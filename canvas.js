@@ -680,8 +680,6 @@ let drawText = (props) => (p) => {
 			: p.stroke(props.stroke)
 		: p.noStroke();
 
-	console.log(props.fill);
-
 	if (fontFamily) p.textFont(fontFamily);
 	// if (props.stroke) doc.stroke(props.stroke);
 	p.textSize(fontSize);

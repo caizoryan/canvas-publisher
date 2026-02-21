@@ -58,7 +58,9 @@ let nodeContainer = (node, attr, children) => {
 			block.height = height.value();
 			block.color = color.value();
 			let d = { ...store.get(getNodeLocation(node.id).concat(["data"])) };
+			let _d = { ...store.get(getNodeLocation(node.id).concat(["_data"])) };
 			block.data = d;
+			block._data = _d;
 
 			duplicateBlock(block);
 
@@ -130,7 +132,7 @@ export let createRegistery = () => {
 	let updateFunctions = [];
 	let register = (name, inputs, outputs, render, transform) => {
 		let id = name;
-		console.log(id);
+		// console.log(id);
 		if (typeof name == "object") {
 			inputs = name.inputs;
 			outputs = name.outputs;
@@ -300,8 +302,15 @@ export let createRegistery = () => {
 
 			memo(() => {
 				if (!outputBuffers.value()) return;
+
+				let internal_data = store.get(
+					getNodeLocation(node.id).concat(["_data"]),
+				);
+
+				// if (internal_data) console.log("THERES INTERNAL DATA", internal_data);
+
 				outputBuffers.value().forEach((id) => {
-					let v = transform(inputParsed.value());
+					let v = transform(inputParsed.value(), internal_data);
 					store.apply(["buffers", id], "set", [node.id, v], false);
 				});
 			}, [outputBuffers, inputParsed, update]);

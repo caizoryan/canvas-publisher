@@ -79,7 +79,6 @@ export let mountBoundingBox = () => {
 
 	let onstart = (e) => {
 		if (e.altKey) {
-			console.log("WHAY THE FUCK WHORRRR");
 			duplicateSelection();
 			return;
 		}

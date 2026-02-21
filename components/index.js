@@ -19,11 +19,11 @@ export let R = (location, id) => (key) => ({
 	subscribe: (fn) => subscribeToId(id, [key], fn),
 });
 
-export let dataR = (location, id) => (key) => ({
+export let dataR = (location, id, data = "data") => (key) => ({
 	isReactive: true,
-	value: () => store.get(location.concat(["data", key])),
-	next: (v) => store.tr(location.concat(["data"]), "set", [key, v], false),
-	subscribe: (fn) => subscribeToId(id, ["data", key], fn),
+	value: () => store.get(location.concat([data, key])),
+	next: (v) => store.tr(location.concat([data]), "set", [key, v], false),
+	subscribe: (fn) => subscribeToId(id, [data, key], fn),
 });
 
 export let getProps = (id) => store.get(getNodeLocation(id).concat(["data"]));

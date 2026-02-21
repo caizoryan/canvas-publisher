@@ -29,6 +29,24 @@ export let objectPlexer = (node, inputs, updateOut) => {
 	return [["span", "{ "], cursor, ["span", " }"]];
 };
 
+export let objectExtractor = (node, inputs, updateOut) => {
+	// Make an R out of key
+	let r = dataR(getNodeLocation(node.id), node.id, "_data");
+	let key = r("key");
+
+	let cursor = dom(["input.object", {
+		type: "text",
+		style: "border-bottom: 1px solid black",
+		oninput: (e) => {
+			key.next(e.target.value.trim());
+			updateOut();
+		},
+		value: key,
+	}]);
+
+	return [["span", "{ "], cursor, ["span", " }"]];
+};
+
 export let colorSliders = (node, inputs, updateOut) => {
 	// Make an R out of key
 	let r = dataR(getNodeLocation(node.id), node.id);
@@ -484,6 +502,7 @@ let Function = (node, inputs) => {
 		if (!edges) return { id: nodeId, out: [] };
 		// .map((e) => e.blockId);
 		let data = store.get(getNodeLocation(nodeId).concat(["data"]));
+		let _data = store.get(getNodeLocation(nodeId).concat(["_data"]));
 		let type = store.get(getNodeLocation(nodeId).concat(["type"]));
 		let transform = registery.getTransformFn(type);
 		let inputs = registery.getInputs(type);
@@ -492,7 +511,7 @@ let Function = (node, inputs) => {
 			.map((e) => e.blockId)
 			.map((e) => follow(e));
 
-		return { id: nodeId, out: outputsTo, data, type, transform, inputs };
+		return { id: nodeId, out: outputsTo, _data, data, type, transform, inputs };
 	};
 
 	let outputBuffers = reactive([]);
@@ -571,7 +590,7 @@ let Function = (node, inputs) => {
 				applyData(node, node.data, buffer, node.inputs);
 
 				e.out.forEach((f) => {
-					execute(f, { [e.id]: node.transform(node.data) });
+					execute(f, { [e.id]: node.transform(node.data, node._data) });
 				});
 			};
 
@@ -580,12 +599,17 @@ let Function = (node, inputs) => {
 					if (e.type == "return" && !returnNode) {
 						returnNode = e.id;
 					}
+
 					virtualNodes[e.id] = {
 						id: e.id,
 						data: { ...e.data },
 						transform: e.transform,
 						inputs: e.inputs,
 					};
+
+					if (e._data) {
+						virtualNodes[e.id]._data = { ...e._data };
+					}
 
 					virtualBuffers[e.id] = {};
 				}
@@ -1002,6 +1026,19 @@ export const ObjectLabeller = {
 		if (!props) return {};
 		const o = {};
 		o[props.key] = props.value;
+		return o;
+	},
+};
+
+export const ObjectExtracter = {
+	id: "ObjectGet",
+	render: objectExtractor,
+	inputs: "ANY",
+	outputs: {},
+	transform: (props, internal) => {
+		if (!props || !internal || typeof internal.key != "string") return {};
+		const o = {};
+		o.value = props[internal.key];
 		return o;
 	},
 };
