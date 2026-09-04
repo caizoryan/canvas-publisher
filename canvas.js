@@ -12,13 +12,37 @@ import { PDFDocument } from "./pdfkit.standalone.js";
 import * as PDFJS from "https://esm.sh/pdfjs-dist";
 import * as PDFWorker from "https://esm.sh/pdfjs-dist/build/pdf.worker.min";
 
-export let pinnedCanvas = dom(["canvas.pinned"]);
+export let pinnedCanvas = dom([".pinned"]);
 
-let pinnedContext = pinnedCanvas.getContext("2d");
+let pinnedContext;
 let pinnedTask;
-pinnedContext.beginPath();
-pinnedContext.rect(20, 20, 150, 100);
-pinnedContext.stroke();
+
+let pinned;
+
+let pageWidth = 612;
+let pageHeight = 792;
+let init = (pp) => {
+	console.log(pp, "what");
+	pinned = pp;
+
+	pinned.setup = () => {
+		console.log("BURGG");
+		pinned.createCanvas(pageHeight, pageWidth);
+
+		pinnedContext = pinned.canvas.getContext("2d");
+
+		// pinned.background(252, 255, 0);
+		// pinned.rect(20, 20, 150, 100);
+	};
+};
+
+setTimeout(() => {
+	new p5(init, pinnedCanvas);
+}, 250);
+
+// pinnedContext.beginPath();
+// pinnedContext.rect(20, 20, 150, 100);
+// pinnedContext.stroke();
 
 let queued = {};
 window.pdfjsWorker = PDFWorker;
@@ -207,6 +231,15 @@ export const renderCanvas = (node, inputs) => {
 	let pageHeight = 792;
 	let paused = false;
 
+	let isPinned = memo(() => state.pinnedNode.value() == node.id, [
+		state.pinnedNode,
+	]);
+
+	let setPinned = () => {
+		state.pinnedNode.next(node.id);
+		next = true;
+	};
+
 	let canvas = dom([".canvas"]);
 
 	let p;
@@ -222,7 +255,7 @@ export const renderCanvas = (node, inputs) => {
 		new p5(init, canvas);
 	}, 150);
 
-	let draw = (drawables) => {
+	let draw = (drawables, canvas) => {
 		if (drawables.length == 0) return;
 
 		let fns = {
@@ -230,7 +263,7 @@ export const renderCanvas = (node, inputs) => {
 			"Text": drawText,
 			"Image": drawImageDocFn,
 			"Line": drawLine,
-			"Group": (props) => (doc) => {
+			"Group": (props) => (p) => {
 				let drawables = props.draw ? props.draw : [];
 
 				drawables.forEach((fn) => {
@@ -244,6 +277,13 @@ export const renderCanvas = (node, inputs) => {
 
 		p.background(250);
 		// console.log("WHAT THE FUCK");
+
+		if (isPinned.value()) {
+			console.log("IS PINNED!");
+			pinned.background(250);
+			fns.Group({ draw: drawables })(pinned);
+			// return;
+		}
 
 		fns.Group({ draw: drawables })(p);
 	};
@@ -267,6 +307,7 @@ export const renderCanvas = (node, inputs) => {
 
 	return [
 		canvas,
+		button("PIN", setPinned),
 	];
 };
 
@@ -324,7 +365,6 @@ export const physariumCanvas = (node, inputs, updateOut) => {
 
 	state.loaded = 0;
 	state.colors = ["yellow", "blue", "red"];
-	state.colors = ["#0468AF", "#058EF0", "#4BB2FB"];
 	state.colors = ["#025002", "#119711", "#35BB35"];
 
 	state.chars = [".", ":", "-", "=", "+", "*", "#", "%"];
@@ -631,7 +671,12 @@ let drawCircle = (props) => (p) => {
 	p.circle(x, y, props.radius ? props.radius * 2 : 5);
 };
 
-let availableFonts = ["Times-Roman", "Hermit", "Oracle", "Fungal"];
+let availableFonts = [
+	"Times-Roman",
+	"Hermit",
+	"Oracle",
+	"Fungal",
+];
 
 let drawTextDocFn = (props) => (doc) => {
 	doc.save();
@@ -688,6 +733,7 @@ let drawText = (props) => (p) => {
 	if (props.boundingBox) {
 		p.stroke(1);
 		p.strokeWeight(props.boundingBox);
+		p.noFill();
 		p.rect(x, y, width, height);
 	}
 	// if (props.stroke) doc.fillAndStroke(props.fill, props.stroke);

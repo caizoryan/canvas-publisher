@@ -1,9 +1,5 @@
 import { reactive } from "./chowk.js";
 import {
-	BlockElement,
-	constructBlockData,
-	constructGroupData,
-	GroupElement,
 	isRectContained,
 	isRectIntersecting,
 	Transform,
@@ -16,8 +12,6 @@ import {
 	state,
 	store,
 } from "./state.js";
-import { add_block } from "./arena.js";
-import { notificationpopup } from "./notification.js";
 import { duplicateBlock } from "./registery.js";
 import { addEdge } from "./state.js";
 

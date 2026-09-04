@@ -1,6 +1,7 @@
 import { memo, reactive } from "./chowk.js";
 import { dom } from "./dom.js";
 import {
+	addEdge,
 	addNode,
 	registery,
 	removeEdge,
@@ -19,10 +20,12 @@ import {
 	button,
 	constructBlockData,
 	CSSTransform,
+	uuid,
 } from "./block.js";
 import { helpbar } from "./help.js";
 import { extract_block_id, link_is_block } from "./md.js";
 import { pinnedCanvas } from "./canvas.js";
+import { propertybar } from "./propertyEditor.js";
 
 // first order of business
 // 1. Get canvas showing and moving like before
@@ -114,6 +117,7 @@ let copySelection = () => {
 const toggleTrackingMode = () =>
 	state.trackpad_movement = !state.trackpad_movement;
 const toggleSidebar = () => state.sidebarOpen.next((e) => !e);
+const togglePropertyBar = () => state.propertybarOpen.next((e) => !e);
 const toggleHelpbar = () => state.helpOpen.next((e) => !e);
 const removeCurrentEdge = () => {
 	state.selectedConnection.value().forEach((edge) => {
@@ -208,23 +212,54 @@ const helpbtn = button(
 
 let listFilter = reactive("");
 let listActive = reactive(false);
+let listSelectIndex = reactive(0);
+
 listActive.subscribe((e) => e ? setTimeout(() => searchList.focus(), 0) : null);
+let filteredList = memo(
+	() =>
+		registery.list.value()
+			.filter((e) =>
+				e.toLowerCase().includes(listFilter.value().toLowerCase())
+			),
+	[registery.list, listFilter],
+);
 let searchList = dom(["input", {
 	type: "text",
 	// onblur: () => setTimeout(() => listActive.next(false), 50),
 	value: "",
 	oninput: (e) => listFilter.next(e.target.value),
+	onkeydown: (e) => {
+		if (e.key == "ArrowDown") {
+			listSelectIndex.next((e) =>
+				e < filteredList.value().length - 1 ? e + 1 : null
+			);
+		}
+		if (e.key == "ArrowUp") listSelectIndex.next((e) => e != 0 ? e - 1 : null);
+		if (e.key == "Escape") {
+			searchList.blur();
+			listActive.next(false);
+		}
+		if (e.key == "Enter") {
+			let selection = filteredList.value()[listSelectIndex.value()];
+			if (selection) {
+				state.making_node = selection;
+				listActive.next(false);
+			}
+		}
+	},
 }]);
 const listmenu = [".lister", { active: listActive }, searchList, [
 	".list-items",
 	memo(
 		() =>
-			registery.list.value()
-				.filter((e) =>
-					e.toLowerCase().includes(listFilter.value().toLowerCase())
-				)
-				.map((e) => button(e, () => state.making_node = e)),
-		[registery.list, listFilter],
+			filteredList.value().map((e, i) =>
+				button(e, () => state.making_node = e, {
+					selected: memo(() => i == listSelectIndex.value(), [
+						listSelectIndex,
+					]),
+				})
+			),
+		[filteredList],
 	),
 ]];
 
@@ -314,6 +349,7 @@ export let mount = () => {
 
 	document.body.appendChild(dom(helpbar));
 	document.body.appendChild(dom(sidebar));
+	document.body.appendChild(dom(propertybar()));
 	document.body.appendChild(dom(buttons));
 };
 
@@ -441,10 +477,12 @@ keys.on("cmd + -", zoomOut, prevent);
 
 keys.on("ArrowRight", moveRight, { disable_in_input: true });
 keys.on("ArrowLeft", moveLeft, { disable_in_input: true });
+
 keys.on("ArrowUp", moveUp, { disable_in_input: true });
 keys.on("ArrowDown", moveDown, { disable_in_input: true });
 
 keys.on("cmd + e", toggleSidebar, prevent);
+keys.on("cmd + shift + e", togglePropertyBar, prevent);
 keys.on("escape", escape, { modifiers: false, disable_in_input: true });
 keys.on("b", vistLast, { modifiers: false, disable_in_input: true });
 keys.on("t", toggleTrackingMode, { disable_in_input: true });
@@ -462,12 +500,30 @@ keys.on("slash", () => listActive.next((e) => !e), {
 	disable_in_input: true,
 	preventDefault: true,
 });
-keys.on("cmd + v", pasteInBlock, {
-	disable_in_input: true,
+
+keys.on("cmd + enter", registery.refreshData, {
 	preventDefault: true,
 });
 
-keys.on("cmd + alt + r", registery.refreshData, {
+keys.on("cmd + shift + c", () => {
+	if (state.selected.value().length >= 2) {
+		let selections = state.selected.value();
+		let start = selections[0];
+		selections.slice(1).forEach((e) => {
+			let end = e;
+
+			addEdge({
+				id: uuid(),
+				fromNode: start,
+				fromSide: "right",
+				toNode: end,
+				toSide: "left",
+			});
+
+			start = e;
+		});
+	}
+}, {
 	disable_in_input: true,
 	preventDefault: true,
 });

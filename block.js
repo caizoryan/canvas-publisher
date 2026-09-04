@@ -1,5 +1,6 @@
 import { update_block } from "./arena.js";
 import { memo, reactive } from "./chowk.js";
+import { round } from "./components/utils.js";
 import { dom } from "./dom.js";
 import { drag } from "./drag.js";
 import { MD } from "./md.js";
@@ -9,6 +10,7 @@ import {
 	addNode,
 	getNodeLocation,
 	removeNode,
+	snap,
 	state,
 	store,
 	subscribeToId,
@@ -410,19 +412,19 @@ export const resizers = (left, top, width, height, opts = {}) => {
 	setTimeout(() => {
 		drag(MainCorner, {
 			set_position: (x, y) => {
-				width.next(x);
-				height.next(y);
+				width.next(snap(x));
+				height.next(snap(y));
 			},
 			...opts,
 		});
 		drag(WidthMiddle, {
-			set_left: (v) => width.next(v),
+			set_left: (v) => width.next(snap(v)),
 			set_top: () => null,
 			...opts,
 		});
 		drag(HeightMiddle, {
 			set_left: () => null,
-			set_top: (v) => height.next(v),
+			set_top: (v) => height.next(snap(v)),
 			...opts,
 		});
 	}, 100);

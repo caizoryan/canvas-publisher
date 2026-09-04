@@ -27,6 +27,7 @@ import {
 	ObjectLabeller,
 	ReadVariable,
 	ReturnObject,
+	round,
 	Slider,
 	Slider2D,
 	String,
@@ -45,7 +46,9 @@ export let state = {
 
 	// 'connect' | 'resize'
 	mode: reactive("pan"),
+	snapping: reactive(50),
 
+	propertybarOpen: reactive("true"),
 	sidebarOpen: reactive(false),
 	helpOpen: reactive(false),
 	making_node: "circle",
@@ -83,6 +86,8 @@ export let state = {
 
 	reRenderEdges: reactive(0),
 };
+
+export let snap = (v) => round(v, state.snapping.value());
 
 // subscribe to currentSlug to update url
 state.currentSlug.subscribe((slug) => history.pushState("", "", "#" + slug));
@@ -623,7 +628,7 @@ let dragMarker = dom(svgrectnormal(
 	memo(
 		() =>
 			(state.holdingCanvas.value() || state.canceled.value())
-				? "#fff1"
+				? "#fff0"
 				: "#0008",
 		[state.holdingCanvas, state.canceled],
 	),

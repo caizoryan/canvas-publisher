@@ -12,7 +12,7 @@ export let svgrectnormal = (
 		width,
 		height,
 		stroke,
-		fill: "#fff1",
+		fill: "#fff0",
 		"stroke-width": strokewidth,
 	}];
 };

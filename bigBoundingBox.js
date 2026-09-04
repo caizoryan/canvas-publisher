@@ -1,9 +1,8 @@
 import { memo } from "./chowk.js";
-import { round } from "./components/utils.js";
 import { dom } from "./dom.js";
 import { drag } from "./drag.js";
 import { duplicateSelection } from "./dragOperations.js";
-import { getNodeLocation, state, store } from "./state.js";
+import { getNodeLocation, snap, state, store } from "./state.js";
 import { svgx } from "./svg.js";
 drag;
 
@@ -105,12 +104,12 @@ export let mountBoundingBox = () => {
 		};
 
 		anchored.forEach((e) => {
-			store.tr(e.blockLocation, "set", ["x", round(e.offset.x + diff.x, 50)]);
-			store.tr(e.blockLocation, "set", ["y", round(e.offset.y + diff.y, 50)]);
+			store.tr(e.blockLocation, "set", ["x", snap(e.offset.x + diff.x)]);
+			store.tr(e.blockLocation, "set", ["y", snap(e.offset.y + diff.y)]);
 		});
 
-		bigbox.style.left = round(x, 50) + "px";
-		bigbox.style.top = round(y, 50) + "px";
+		bigbox.style.left = snap(x) + "px";
+		bigbox.style.top = snap(y) + "px";
 	};
 
 	setTimeout(() => {

@@ -14,6 +14,7 @@ import {
 	EDGEMAP,
 	getNodeLocation,
 	NODES,
+	snap,
 	state,
 	store,
 	subscribeToId,
@@ -92,8 +93,8 @@ let nodeContainer = (node, attr, children) => {
 			onstart,
 			onend,
 			set_position: (x, y) => {
-				left.next(round(x, 50));
-				top.next(round(y, 50));
+				left.next(snap(x));
+				top.next(snap(y));
 			},
 		});
 	}, 50);
